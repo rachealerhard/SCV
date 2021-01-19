@@ -1,8 +1,14 @@
 """
-Simple analysis of range for battery-electric transport aircraft (based on Cessna 208 Caravan)
+Range analysis for battery-electric transport aircraft
+(based on Cessna 208 Caravan)
+
+    Nick Goodson
+    Jan 2021
 """
-import math
+import numpy as np
+import matplotlib.pyplot as plt
 import pdb
+import argparse
 
 
 ### Environment Parameters ###
@@ -21,12 +27,12 @@ class Cessna208:
     # aero
     wingspan = 15.87  # [m]
     wing_area = 25.96 # [m^2]
-    wing_efficiency = 0.9  # Oswald efficiency factor
+    wing_efficiency = 0.8  # Oswald efficiency factor
     drag_coeff_parasitic = 0.034  # estimate for small AoA
 
     # performance
     cruise_speed = 344 / 3.6  # [m/s]
-    cruise_altitude = 7500  # [km]
+    cruise_ceiling = 7500  # [km]
     climb_rate = 6.27  # [m/s]
     takeoff_distance = 626  # [m]
     standard_range = 1982e3  # [m]
@@ -42,11 +48,11 @@ class Cessna208:
 
 class ElectricCessna(Cessna208):
 
-    def __init__(self, cargo_mass):
+    def __init__(self, cargo_mass=0, battery_mass=None, energy_density=180):
         super().__init__(cargo_mass)
         # propulsion
-        self.energy_density = 180  # [Wh/kg]
-        self.battery_mass = self.fuel_mass  # [kg]
+        self.energy_density = energy_density  # [Wh/kg]
+        self.battery_mass = battery_mass if battery_mass else self.fuel_mass  # [kg]
 
     @property
     def total_mass(self):
@@ -59,7 +65,30 @@ class ElectricCessna(Cessna208):
         return _battery_capacity
 
 
-def compute_air_density(altitude):
+def main(*args):
+
+    aircraft = ElectricCessna()
+
+    n_points = 20
+    cargo_masses = np.linspace(10, 1500, n_points)
+    battery_masses = np.linspace(200, 1000, n_points)
+    # CM, BM = np.meshgrid(cargo_masses, battery_masses, indexing='xy')
+
+    flight_ranges = np.zeros((n_points, n_points))
+    for i, cargo in enumerate(cargo_masses):
+        for j, battery in enumerate(battery_masses):
+            aircraft.cargo_mass = cargo
+            aircraft.battery_mass = battery
+            flight_ranges[i, j] = flightRange(aircraft, verbose=args[0])
+
+    fig, ax = plt.subplots(figsize=(8,10))
+    ax.contourf(cargo_masses, battery_masses, flight_ranges)
+    ax.set_ylabel("Cargo mass [kg]")
+    ax.set_xlabel("Battery mass [kg]")
+    plt.show()
+
+
+def airDensity(altitude):
     """
     Standard atmospheric model (capped at 11 km ~ 35,000 ft)
     """
@@ -76,36 +105,63 @@ def compute_air_density(altitude):
     return density
 
 
-def compute_takeoff_energy(total_weight, cfg):
+def optimalAltitude(cfg):
     """
-    Estimate the energy usage in takeoff/climb from the stall speed and engine specs
+    Compute the optimal altitude for maximum range at given cruise speed
+    """
+    # TODO: implement properly
+    return cfg.cruise_ceiling
+
+
+def takeoffEnergy(total_weight, cfg):
+    """
+    Estimate the energy usage in takeoff from takeoff distance and engine specs
     Thrust computation is an approximation assuming a very low free-stream velocity
     """
-    density = compute_air_density(10)
-    thrust = (0.5 * density * math.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
-    takeoff_time = math.sqrt(2 * cfg.takeoff_distance * total_weight / (thrust * gravity))
-    climb_time = cfg.cruise_altitude / cfg.climb_rate
-    takeoff_energy = (takeoff_time  + climb_time * 0.8) * cfg.engine_max_power
+    # TODO: Replace cfg.takeoff_distance with lift computation.
+
+    density = airDensity(10)
+    thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
+    takeoff_time = np.sqrt(2 * cfg.takeoff_distance * total_weight / (thrust * gravity))
+    takeoff_energy = takeoff_time * cfg.engine_max_power
     return takeoff_energy 
 
 
-def compute_range(cfg, verbose=True):
+def climbEnergy(cruise_altitude, total_weight, cfg):
     """
-    Compute the flight range with simple approximations
+    Estimate energy usage during climb given a known climb rate
+    """
+    climb_time = cruise_altitude / cfg.climb_rate
+
+    # TODO: Implement properly using drag
+    climb_energy = total_weight * cruise_altitude * 1.5
+    return climb_energy
+
+
+def flightRange(cfg, verbose=True):
+    """
+    Compute the flight range with simple approximations for takeoff
+    climb and cruise
     """
     total_weight = cfg.total_mass * gravity  # [N]
     aspect_ratio = (cfg.wingspan ** 2) / cfg.wing_area
     energy_stored = cfg.battery_capacity * 3600  # [J]
 
     # takeoff
-    takeoff_energy = compute_takeoff_energy(total_weight, cfg)
+    takeoff_energy = takeoffEnergy(total_weight, cfg)
     energy_stored -= takeoff_energy
 
+    # climb
+    cruise_altitude = optimalAltitude(cfg)
+    climb_energy = climbEnergy(cruise_altitude, total_weight, cfg)
+    energy_stored -= climb_energy
+
     # cruise
-    air_density = compute_air_density(cfg.cruise_altitude)
+    cruise_altitude = optimalAltitude(cfg) 
+    air_density = airDensity(cruise_altitude)
     dynamic_pressure = 0.5 * air_density * cfg.cruise_speed ** 2
     lift_coeff = total_weight / (dynamic_pressure * cfg.wing_area)
-    drag_coeff_induced =  (lift_coeff ** 2) / (math.pi * aspect_ratio * cfg.wing_efficiency)
+    drag_coeff_induced =  (lift_coeff ** 2) / (np.pi * aspect_ratio * cfg.wing_efficiency)
     drag_area_total = cfg.wing_area * (drag_coeff_induced + cfg.drag_coeff_parasitic)
     drag = drag_area_total * dynamic_pressure  # [N]
 
@@ -113,27 +169,18 @@ def compute_range(cfg, verbose=True):
     flight_range = cfg.cruise_speed * energy_stored / cruise_power
 
     if verbose:
-        print(f"\nTotal mass: {total_weight / gravity :.2f} [kg]")
-        print(f"Aspect ratio: {aspect_ratio :.3f}")
-        print(f"Induced drag coefficient: {drag_coeff_induced :.3f}")
-        print(f"Takeoff energy: {takeoff_energy / 3600 :.2f} [Wh]")
-        print(f"Cruise power output: {cruise_power / 1000 :.2f} [kW]")
+        print(f"\nTakeoff energy: {takeoff_energy / 3600 :<.2f} [Wh]")
+        print(f"Climb energy: {climb_energy / 3600 :<.2f} [Wh]")
+        print(f"Cruise power output: {cruise_power / 1000 :<.2f} [kW]")
+
     return flight_range
 
 
-def main():
-
-    # Electric
-    aircraft = ElectricCessna(cargo_mass=500)
-    flight_range = compute_range(aircraft)
-    print(f"\nBattery mass: {aircraft.battery_mass :.2f} [kg]")
-    print(f"Battery Capacity: {aircraft.battery_capacity :.2f} [Wh]")
-    print(f"Cargo mass: {aircraft.cargo_mass :.2f} [kg]")
-    print(f"Electric flight range: {flight_range / 1000 :.2f} [km]")
-
-
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", action='store_true')
+    args = parser.parse_args()
+    main(args.verbose)
 
 
 
