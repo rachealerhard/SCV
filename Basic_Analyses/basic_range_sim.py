@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+from scipy import integrate
 import pdb
 import argparse
 
@@ -116,6 +117,10 @@ def airDensity(altitude):
     return density
 
 
+def dynamicPressure(density, velocity):
+    return 0.5 * density * velocity ** 2
+
+
 def optimalAltitude(cfg):
     """
     Compute the optimal altitude for maximum range at given cruise speed
@@ -131,17 +136,24 @@ def optimalAltitude(cfg):
 
     if optimal_altitude > cfg.cruise_ceiling:
         print("Cruise ceiling exceeded")
-        optimal_altitude = cfg.cruise_ceiling
-
+        # optimal_altitude = cfg.cruise_ceiling
     return optimal_altitude
 
 
-def takeoffEnergy(total_weight, cfg):
+def inducedDrag(dynamic_pressure, cfg):
+    """
+    Compute the induced drag
+    """
+    lift_coeff = cfg.total_mass * gravity / (dynamic_pressure * cfg.wing_area)
+    drag_coeff_induced =  (lift_coeff ** 2) / (np.pi * aspect_ratio * cfg.wing_efficiency)
+    return drag_coeff_induced
+
+
+def takeoffEnergy(cfg):
     """
     Estimate the energy usage in takeoff from takeoff distance and engine specs
     Thrust computation is an approximation assuming a very low free-stream velocity
     """
-    # TODO: Replace cfg.takeoff_distance with lift requirement computation.
     density = airDensity(1)
     thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
     takeoff_time = np.sqrt(2 * cfg.takeoff_distance * total_weight / thrust)
@@ -149,14 +161,23 @@ def takeoffEnergy(total_weight, cfg):
     return takeoff_energy 
 
 
-def climbEnergy(cruise_altitude, total_weight, cfg):
+def climbEnergy(cruise_altitude, takeoff_speed, cfg):
     """
     Estimate energy usage during climb given a known climb rate
+    Assumes a linear speed increase up to the cruise speed
     """
     climb_time = cruise_altitude / cfg.climb_rate
 
-    # TODO: Implement properly using drag
-    climb_energy = total_weight * cruise_altitude * 1.5
+    def thrust_power(time):
+        speed = (cfg.cruise_speed / climb_time) * time + takeoff_speed # linear profile
+        altitude = cfg.climb_rate * time
+        density = airDensity(altitude)
+        drag = (cfg.drag_coeff_parasitic + inducedDrag(altitude, speed, cfg)) * cfg.wing_area * dynamicPressure(density, speed)
+        thrust = drag + cfg.total_mass * gravity * cfg.climb_rate / speed
+        power = thrust * speed
+        return power
+
+    climb_energy = integrate.quad(thrust_power, 0, climb_time)
     return climb_energy
 
 
@@ -175,18 +196,14 @@ def flightRange(cfg, verbose=True):
 
     # climb
     cruise_altitude = optimalAltitude(cfg)
-    climb_energy = climbEnergy(cruise_altitude, total_weight, cfg)
+    climb_energy = climbEnergy(cruise_altitude, cfg)
     energy_stored -= climb_energy
 
     # cruise
-    cruise_altitude = optimalAltitude(cfg) 
-    air_density = airDensity(cruise_altitude)
-    dynamic_pressure = 0.5 * air_density * cfg.cruise_speed ** 2
-    lift_coeff = total_weight / (dynamic_pressure * cfg.wing_area)
-    drag_coeff_induced =  (lift_coeff ** 2) / (np.pi * aspect_ratio * cfg.wing_efficiency)
-    drag_area_total = cfg.wing_area * (drag_coeff_induced + cfg.drag_coeff_parasitic)
-    drag = drag_area_total * dynamic_pressure  # [N]
-
+    cruise_altitude = optimalAltitude(cfg)
+    density = airDensity(cruise_altitude)
+    drag_coeff_induced = inducedDrag(cruise_altitude, cfg.cruise_speed, cfg)
+    drag = cfg.wing_area * dynamicPressure(density, cfg.cruise_speed) * (drag_coeff_induced + cfg.drag_coeff_parasitic)  # [N]
     cruise_power = drag * cfg.cruise_speed  # [W]
     flight_range = cfg.cruise_speed * energy_stored / cruise_power
 
