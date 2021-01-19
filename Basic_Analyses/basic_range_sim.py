@@ -149,11 +149,23 @@ def inducedDrag(dynamic_pressure, cfg):
     return drag_coeff_induced
 
 
+def takeoffSpeed(cfg):
+    """
+    Computes required speed for takeoff from estimate of the lift coefficient
+    """
+    angle_of_attack = 15 * (np.pi / 180)  # [rad]
+    CL0 = 2 * np.pi * angle_of_attack 
+    lift_coefficient = CL0 / (1 + CL0 / (np.pi * cfg.wing_efficiency * cfg.aspect_ratio))
+    speed = np.sqrt(cfg.total_mass * gravity / (0.5 * airDensity(1) * lift_coefficient * cfg.wing_area))
+    return speed
+
+
 def takeoffEnergy(cfg):
     """
     Estimate the energy usage in takeoff from takeoff distance and engine specs
     Thrust computation is an approximation assuming a very low free-stream velocity
     """
+    # TODO: estimate lift coefficient to compute takeoff velocity. Then use this velocity to compute energy
     density = airDensity(1)
     thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
     takeoff_time = np.sqrt(2 * cfg.takeoff_distance * total_weight / thrust)
@@ -191,12 +203,13 @@ def flightRange(cfg, verbose=True):
     energy_stored = cfg.battery_capacity * 3600  # [J]
 
     # takeoff
+    takeoff_speed = takeoffSpeed(cfg)
     takeoff_energy = takeoffEnergy(cfg)
     energy_stored -= takeoff_energy
 
     # climb
     cruise_altitude = optimalAltitude(cfg)
-    climb_energy = climbEnergy(cruise_altitude, cfg)
+    climb_energy = climbEnergy(cruise_altitude, takeoff_speed, cfg)
     energy_stored -= climb_energy
 
     # cruise
