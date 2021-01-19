@@ -160,15 +160,14 @@ def takeoffSpeed(cfg):
     return speed
 
 
-def takeoffEnergy(cfg):
+def takeoffEnergy(takeoff_speed, cfg):
     """
     Estimate the energy usage in takeoff from takeoff distance and engine specs
     Thrust computation is an approximation assuming a very low free-stream velocity
     """
-    # TODO: estimate lift coefficient to compute takeoff velocity. Then use this velocity to compute energy
     density = airDensity(1)
     thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
-    takeoff_time = np.sqrt(2 * cfg.takeoff_distance * total_weight / thrust)
+    takeoff_time = takeoff_speed * cfg.total_mass / thrust
     takeoff_energy = takeoff_time * cfg.engine_max_power
     return takeoff_energy 
 
@@ -204,7 +203,7 @@ def flightRange(cfg, verbose=True):
 
     # takeoff
     takeoff_speed = takeoffSpeed(cfg)
-    takeoff_energy = takeoffEnergy(cfg)
+    takeoff_energy = takeoffEnergy(takeoff_speed, cfg)
     energy_stored -= takeoff_energy
 
     # climb
