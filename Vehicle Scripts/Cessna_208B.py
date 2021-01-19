@@ -342,8 +342,217 @@ def missions_setup(base_mission):
 # ----------------------------------------------------------------------
 #   Plot Mission
 # ----------------------------------------------------------------------
-
 def plot_mission(results,line_style='bo-'):
+
+    axis_font = {'fontname':'Arial', 'size':'14'}  
+    line_color = 'bo-'    
+    #------------------------------------------------
+    # Plot Flight Conditions 
+    #------------------------------------------------
+    axis_font = {'size':'14'} 
+    fig = plt.figure()
+    fig.set_size_inches(12, 10)
+    for segment in results.segments.values(): 
+        time     = segment.conditions.frames.inertial.time[:,0] / Units.min
+        airspeed = segment.conditions.freestream.velocity[:,0] 
+        theta    = segment.conditions.frames.body.inertial_rotations[:,1,None] / Units.deg
+        
+        x        = segment.conditions.frames.inertial.position_vector[:,0]
+        y        = segment.conditions.frames.inertial.position_vector[:,1]
+        z        = segment.conditions.frames.inertial.position_vector[:,2]
+        altitude = segment.conditions.freestream.altitude[:,0]
+        
+        axes = fig.add_subplot(2,2,1)
+        axes.plot(time, altitude, line_color)
+        axes.set_ylabel('Altitude (m)',axis_font)
+        set_axes(axes)            
+
+        axes = fig.add_subplot(2,2,2)
+        axes.plot( time , airspeed , line_color )
+        axes.set_ylabel('Airspeed (m/s)',axis_font)
+        set_axes(axes)
+
+        axes = fig.add_subplot(2,2,3)
+        axes.plot( time , theta, line_color )
+        axes.set_ylabel('Pitch Angle (deg)',axis_font)
+        axes.set_xlabel('Time (min)',axis_font)
+        set_axes(axes)   
+        
+        axes = fig.add_subplot(2,2,4)
+        axes.plot( time , x/1000, 'bo-') #, time , y, 'go-' , time , z, 'ro-')
+        axes.set_ylabel('Range (km)',axis_font)
+        axes.set_xlabel('Time (min)',axis_font)
+        set_axes(axes)         
+        
+    
+    
+    #------------------------------------------------
+    # Plot Aerodynamic Forces 
+    #------------------------------------------------
+    axis_font = {'size':'14'}
+    fig = plt.figure()
+    fig.set_size_inches(12, 10)
+    
+    for segment in results.segments.values():
+        time   = segment.conditions.frames.inertial.time[:,0] / Units.min
+        Thrust = segment.conditions.frames.body.thrust_force_vector[:,0]  
+        Lift   = -segment.conditions.frames.wind.lift_force_vector[:,2]
+        Drag   = -segment.conditions.frames.wind.drag_force_vector[:,0]          
+        eta    = segment.conditions.propulsion.throttle[:,0]
+
+        axes = fig.add_subplot(2,2,1)
+        axes.plot( time , eta , line_color )
+        axes.set_ylabel('Throttle',axis_font)
+        set_axes(axes)	 
+
+        axes = fig.add_subplot(2,2,2)
+        axes.plot( time , Lift , line_color)
+        axes.set_ylabel('Lift (N)',axis_font)
+        set_axes(axes)
+        
+        axes = fig.add_subplot(2,2,3)
+        axes.plot( time , Thrust , line_color)
+        axes.set_ylabel('Thrust (N)',axis_font)
+        axes.set_xlabel('Time (min)',axis_font)
+        set_axes(axes)
+        
+        axes = fig.add_subplot(2,2,4)
+        axes.plot( time , Drag , line_color)
+        axes.set_ylabel('Drag (N)',axis_font)
+        axes.set_xlabel('Time (min)',axis_font)
+        set_axes(axes)      
+    
+
+    #------------------------------------------------
+    # Plot Aerodynamic Coefficients 
+    #------------------------------------------------
+    axis_font = {'size':'14'}  
+    fig = plt.figure()
+    fig.set_size_inches(12, 10)
+    
+    for segment in results.segments.values(): 
+        time = segment.conditions.frames.inertial.time[:,0] / Units.min
+        cl   = segment.conditions.aerodynamics.lift_coefficient[:,0,None] 
+        cd   = segment.conditions.aerodynamics.drag_coefficient[:,0,None] 
+        aoa  = segment.conditions.aerodynamics.angle_of_attack[:,0] / Units.deg
+        l_d  = cl/cd
+
+        axes = fig.add_subplot(2,2,1)
+        axes.plot( time , aoa , line_color )
+        axes.set_ylabel('Angle of Attack (deg)',axis_font)
+        set_axes(axes)
+
+        axes = fig.add_subplot(2,2,2)
+        axes.plot( time , cl, line_color )
+        axes.set_ylabel('CL',axis_font)
+        set_axes(axes)   
+        
+        axes = fig.add_subplot(2,2,3)
+        axes.plot( time , cd, line_color )
+        axes.set_xlabel('Time (min)',axis_font)
+        axes.set_ylabel('CD',axis_font)
+        set_axes(axes)   
+        
+        axes = fig.add_subplot(2,2,4)
+        axes.plot( time , l_d, line_color )
+        axes.set_xlabel('Time (min)',axis_font)
+        axes.set_ylabel('L/D',axis_font)
+        set_axes(axes)            
+
+    
+    #------------------------------------------------    
+    # Drag Components
+    #------------------------------------------------
+    axis_font = {'size':'14'} 
+    fig    = plt.figure()
+    fig.set_size_inches(12, 10)     
+    axes = fig.add_subplot(1,1,1) 
+    
+    for i, segment in enumerate(results.segments.values()):
+        time   = segment.conditions.frames.inertial.time[:,0] / Units.min
+        drag_breakdown = segment.conditions.aerodynamics.drag_breakdown
+        cdp = drag_breakdown.parasite.total[:,0]
+        cdi = drag_breakdown.induced.total[:,0]
+        cdc = drag_breakdown.compressible.total[:,0]
+        cdm = drag_breakdown.miscellaneous.total[:,0]
+        cd  = drag_breakdown.total[:,0]
+        
+        axes.plot( time , cdp , 'ko-', label='CD parasite' )
+        axes.plot( time , cdi , line_color, label='CD induced' )
+        axes.plot( time , cdc , 'go-', label='CD compressibility' )
+        axes.plot( time , cdm , 'yo-', label='CD miscellaneous' )
+        axes.plot( time , cd  , 'ro-', label='CD total'   )            
+        if i == 0: 
+            axes.legend(loc='upper center')   
+            
+    axes.set_xlabel('Time (min)',axis_font)
+    axes.set_ylabel('CD',axis_font)
+    axes.grid(True)  
+
+    #------------------------------------------------    
+    # Plot Altitude, sfc, vehicle weight 
+    #------------------------------------------------
+    axis_font = {'size':'14'} 
+    fig = plt.figure()
+    fig.set_size_inches(10, 8) 
+    for segment in results.segments.values(): 
+        time     = segment.conditions.frames.inertial.time[:,0] / Units.min 
+        mass     = segment.conditions.weights.total_mass[:,0] / Units.lb
+        altitude = segment.conditions.freestream.altitude[:,0] / Units.ft
+        mdot     = segment.conditions.weights.vehicle_mass_rate[:,0]
+        thrust   =  segment.conditions.frames.body.thrust_force_vector[:,0]
+        sfc      = (mdot / Units.lb) / (thrust /Units.lbf) * Units.hr
+
+        axes = fig.add_subplot(3,1,1)
+        axes.plot( time , altitude , line_color)
+        axes.set_ylabel('Altitude (ft)',axis_font)
+        set_axes(axes)
+
+        axes = fig.add_subplot(3,1,3)
+        axes.plot( time , sfc , line_color )
+        axes.set_xlabel('Time (min)',axis_font)
+        axes.set_ylabel('sfc (lb/lbf-hr)',axis_font)
+        set_axes(axes)
+
+        axes = fig.add_subplot(3,1,2)
+        axes.plot( time , mass , 'ro-' )
+        axes.set_ylabel('Weight (lb)',axis_font)
+        set_axes(axes)
+        
+    
+    #------------------------------------------------
+    # Plot Velocities 
+    #------------------------------------------------  
+    axis_font = {'size':'14'}  
+    fig = plt.figure()
+    fig.set_size_inches(10, 8) 
+    for segment in results.segments.values(): 
+        time     = segment.conditions.frames.inertial.time[:,0] / Units.min 
+        velocity = segment.conditions.freestream.velocity[:,0] 
+        density  = segment.conditions.freestream.density[:,0]
+        EAS      = velocity * np.sqrt(density/1.225)
+        mach     = segment.conditions.freestream.mach_number[:,0]
+
+        axes = fig.add_subplot(3,1,1)
+        axes.plot( time , velocity / Units.kts, line_color)
+        axes.set_ylabel('velocity (kts)',axis_font)
+        set_axes(axes)
+
+        axes = fig.add_subplot(3,1,2)
+        axes.plot( time , EAS / Units.kts, line_color)
+        axes.set_xlabel('Time (min)',axis_font)
+        axes.set_ylabel('Equivalent Airspeed',axis_font)
+        set_axes(axes)    
+        
+        axes = fig.add_subplot(3,1,3)
+        axes.plot( time , mach , line_color)
+        axes.set_xlabel('Time (min)',axis_font)
+        axes.set_ylabel('Mach',axis_font)
+        set_axes(axes)  
+
+        
+    return
+def plots(results,line_style='bo-'):
 
     axis_font = {'fontname':'Arial', 'size':'14'}  
     # Plot Flight Conditions 
@@ -366,6 +575,17 @@ def plot_mission(results,line_style='bo-'):
 
         
     return
+def set_axes(axes):
+    """This sets the axis parameters for all plots
+    """       
+    axes.minorticks_on()
+    axes.grid(which='major', linestyle='-', linewidth=0.5, color='grey')
+    axes.grid(which='minor', linestyle=':', linewidth=0.5, color='grey')      
+    axes.grid(True)   
+    axes.get_yaxis().get_major_formatter().set_scientific(False)
+    axes.get_yaxis().get_major_formatter().set_useOffset(False)        
+
+    return  
 
 if __name__ == '__main__': 
     main()    
