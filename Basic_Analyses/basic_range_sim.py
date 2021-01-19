@@ -1,18 +1,23 @@
 """
 Range analysis for battery-electric transport aircraft
-(based on Cessna 208 Caravan)
+(based on Cessna 208B Caravan)
 
     Nick Goodson
     Jan 2021
 """
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 import pdb
 import argparse
 
 
 ### Environment Parameters ###
 gravity = 9.8066  # [m/s^2]
+R = 287
+density_msl = 1.225  # [kg/m^3]
+temp_msl = 288.16  # [K]
 
 
 ### Aircraft Parameters ###
@@ -72,7 +77,6 @@ def main(*args):
     n_points = 20
     cargo_masses = np.linspace(10, 1500, n_points)
     battery_masses = np.linspace(200, 1000, n_points)
-    # CM, BM = np.meshgrid(cargo_masses, battery_masses, indexing='xy')
 
     flight_ranges = np.zeros((n_points, n_points))
     for i, cargo in enumerate(cargo_masses):
@@ -81,10 +85,22 @@ def main(*args):
             aircraft.battery_mass = battery
             flight_ranges[i, j] = flightRange(aircraft, verbose=args[0])
 
-    fig, ax = plt.subplots(figsize=(8,10))
-    ax.contourf(cargo_masses, battery_masses, flight_ranges)
-    ax.set_ylabel("Cargo mass [kg]")
-    ax.set_xlabel("Battery mass [kg]")
+    # Visualize results
+    range_kms = flight_ranges / 1000
+    fig1, ax1 = plt.subplots(figsize=(8,10))
+    ax1.contourf(cargo_masses, battery_masses, range_kms)
+    ax1.set_ylabel("Cargo mass [kg]")
+    ax1.set_xlabel("Battery mass [kg]")
+    plt.show()
+
+    fig = plt.figure()
+    ax2 = fig.gca(projection='3d')
+    CM, BM = np.meshgrid(cargo_masses, battery_masses, indexing='ij') 
+    surf = ax2.plot_surface(CM, BM, range_kms, 
+                        cmap=cm.coolwarm, linewidth=0, antialiased=False)
+    ax2.set_xlabel("Cargo mass [kg]")
+    ax2.set_ylabel("Battery mass [kg]")
+    ax2.set_zlabel("Range [km]")
     plt.show()
 
 
@@ -92,25 +108,32 @@ def airDensity(altitude):
     """
     Standard atmospheric model (capped at 11 km ~ 35,000 ft)
     """
-    R = 287
-    density_msl = 1.225  # [kg/m^3]
-    temp_msl = 288.16  # [K]
-
     if altitude > 11000:
         raise ValueError("altitude cannot exceed 11 km")
-
     temp_gradient = (216.7 - temp_msl) / 11000
-    temp = altitude * temp_gradient + temp_msl
-    density = density_msl * (temp / temp_msl) ** -(gravity / (temp_gradient * R) + 1)
+    temperature = altitude * temp_gradient + temp_msl
+    density = density_msl * (temperature / temp_msl) ** -(gravity / (temp_gradient * R) + 1)
     return density
 
 
 def optimalAltitude(cfg):
     """
     Compute the optimal altitude for maximum range at given cruise speed
+    (induced drag = parasitic drag)
     """
-    # TODO: implement properly
-    return cfg.cruise_ceiling
+    lift = cfg.total_mass * gravity
+    optimum_dynamic_pressure = 0.5 * np.sqrt((4 * lift ** 2) / (cfg.wing_area * 
+                            cfg.drag_coeff_parasitic * np.pi * cfg.wing_efficiency * cfg.wingspan ** 2))
+    density = 2 * optimum_density / (cfg.cruise_speed ** 2)
+    temperature = temp_msl * (density / density_msl) ** (-1 / (gravity / (temp_gradient * R) + 1))
+    temp_gradient = (216.7 - temp_msl) / 11000
+    optimal_altitude = (temperature - temp_msl) / temp_gradient
+
+    if optimal_altitude > cfg.cruise_ceiling:
+        print("Cruise ceiling exceeded")
+        optimal_altitude = cfg.cruise_ceiling
+
+    return optimal_altitude
 
 
 def takeoffEnergy(total_weight, cfg):
@@ -118,11 +141,10 @@ def takeoffEnergy(total_weight, cfg):
     Estimate the energy usage in takeoff from takeoff distance and engine specs
     Thrust computation is an approximation assuming a very low free-stream velocity
     """
-    # TODO: Replace cfg.takeoff_distance with lift computation.
-
-    density = airDensity(10)
+    # TODO: Replace cfg.takeoff_distance with lift requirement computation.
+    density = airDensity(1)
     thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
-    takeoff_time = np.sqrt(2 * cfg.takeoff_distance * total_weight / (thrust * gravity))
+    takeoff_time = np.sqrt(2 * cfg.takeoff_distance * total_weight / thrust)
     takeoff_energy = takeoff_time * cfg.engine_max_power
     return takeoff_energy 
 
@@ -148,7 +170,7 @@ def flightRange(cfg, verbose=True):
     energy_stored = cfg.battery_capacity * 3600  # [J]
 
     # takeoff
-    takeoff_energy = takeoffEnergy(total_weight, cfg)
+    takeoff_energy = takeoffEnergy(cfg)
     energy_stored -= takeoff_energy
 
     # climb
