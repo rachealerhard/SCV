@@ -12,6 +12,7 @@ import SUAVE
 from SUAVE.Core import Units, Data
 from SUAVE.Plots.Mission_Plots import *
 
+# Use Cessna 208B IC Aircraft:
 from vehicle_setup_Cessna208B import vehicle_setup
 
 
@@ -24,6 +25,7 @@ import pylab as plt
 # ----------------------------------------------------------------------
 
 def main():
+    
     # Setup the vehicle and analyses
     configs, analyses = full_setup()
 
@@ -109,13 +111,6 @@ def base_analysis(vehicle):
     analyses.append(aerodynamics)
 
     # ------------------------------------------------------------------
-    #  Stability Analysis
-    stability = SUAVE.Analyses.Stability.Fidelity_Zero()    
-    #stability.settings.spanwise_vortex_density                  = 3
-    stability.geometry = vehicle
-    analyses.append(stability)
-
-    # ------------------------------------------------------------------
     #  Energy
     energy= SUAVE.Analyses.Energy.Energy()
     energy.network = vehicle.propulsors 
@@ -132,7 +127,6 @@ def base_analysis(vehicle):
     atmosphere.features.planet = planet.features
     analyses.append(atmosphere)   
 
-    # done!
     return analyses    
 
 
@@ -206,26 +200,105 @@ def simple_sizing(configs):
     # diff the new data
     base.store_diff()
 
-    # ------------------------------------------------------------------
-    #   Landing Configuration
-    # ------------------------------------------------------------------
-    landing = configs.landing
-
-    # make sure base data is current
-    landing.pull_base()
-
-    # landing weight
-    landing.mass_properties.landing = 0.85 * base.mass_properties.takeoff
-
-    # diff the new data
-    landing.store_diff()
-
-    # done!
     return
 
 # ----------------------------------------------------------------------
 #   Define the Mission
 # ----------------------------------------------------------------------
+def mission_setup_2(analyses,vehicle):
+
+    # ------------------------------------------------------------------
+    #   Initialize the Mission
+    # ------------------------------------------------------------------
+
+    mission = SUAVE.Analyses.Mission.Sequential_Segments()
+    mission.tag = 'the_mission'
+
+    #airport
+    airport = SUAVE.Attributes.Airports.Airport()
+    airport.altitude   =  0.0  * Units.ft
+    airport.delta_isa  =  0.0
+    airport.atmosphere = SUAVE.Attributes.Atmospheres.Earth.US_Standard_1976()
+
+    mission.airport = airport    
+
+    # unpack Segments module
+    Segments = SUAVE.Analyses.Mission.Segments
+
+    # base segment
+    base_segment = Segments.Segment()
+    
+    # ------------------------------------------------------------------
+    #   First Climb Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------
+
+    segment = Segments.Climb.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "climb_1"
+
+    segment.analyses.extend( analyses.takeoff )
+
+    segment.altitude_start = 0.   * Units.meter
+    segment.altitude_end   = 2000. * Units.meter
+    segment.air_speed      = 125.  * Units.mph
+    segment.climb_rate     = 1000.  * Units['ft/min'] # max climb rate for the Cessna Caravan is 1234 ft/min
+
+    # add to misison
+    mission.append_segment(segment)
+    
+    # ------------------------------------------------------------------
+    #   Second Climb Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------
+
+    segment = Segments.Climb.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "climb_2"
+
+    segment.analyses.extend( analyses.takeoff )
+
+    segment.altitude_start = 2000. * Units.meter
+    segment.altitude_end   = 4500. * Units.meter
+    segment.air_speed      = 150.  * Units.mph
+    segment.climb_rate     = 1000. * Units['ft/min'] # max climb rate for the Cessna Caravan
+
+    # add to misison
+    mission.append_segment(segment)
+     
+
+    # ------------------------------------------------------------------
+    #   First Cruise Segment: constant Speed, constant altitude
+    # ------------------------------------------------------------------
+
+    segment = Segments.Cruise.Constant_Speed_Constant_Altitude(base_segment)
+    segment.tag = "cruise"
+
+    segment.analyses.extend( analyses.cruise )
+
+    segment.altitude  = 4500. * Units.meter # 7620.  * Units.meter
+    segment.air_speed = 180.   * Units.mph
+    segment.distance  = 75.   * Units.kilometer
+
+    # add to misison
+    mission.append_segment(segment)    
+    
+    
+    # ------------------------------------------------------------------
+    #   Descent Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------ 
+    segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "decent" 
+    segment.analyses.extend( analyses.landing ) 
+    segment.altitude_start            = 4500. * Units.meter # 7620.  * Units.meter
+    segment.altitude_end              = 2500  * Units.meter
+    segment.air_speed                 = 140. * Units['mph']  
+    segment.climb_rate                = - 500.  * Units['ft/min']  
+
+    # add to misison
+    mission.append_segment(segment)     
+
+    # ------------------------------------------------------------------
+    #   Mission definition complete    
+    # ------------------------------------------------------------------
+
+    return mission
 
 def mission_setup(analyses,vehicle):
 
@@ -312,12 +385,39 @@ def mission_setup(analyses,vehicle):
     segment.analyses.extend( analyses.cruise )
 
     segment.altitude  = 7620.  * Units.meter
-    segment.air_speed = 214.   * Units.mph
-    segment.distance  = 1900.   * Units.kilometer
+    segment.air_speed = 190.   * Units.mph
+    segment.distance  = 1500.   * Units.kilometer
 
     # add to misison
     mission.append_segment(segment)    
+    
+    # ------------------------------------------------------------------
+    #   First Descent Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------ 
+    segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "decent_1" 
+    segment.analyses.extend( analyses.landing ) 
+    segment.altitude_start            = 7500. * Units.meter # 7620.  * Units.meter
+    segment.altitude_end              = 4500  * Units.meter
+    segment.air_speed                 = 170. * Units['mph']  
+    segment.climb_rate                = - 500.  * Units['ft/min']  
+    
+    # add to misison
+    mission.append_segment(segment)      
 
+    # ------------------------------------------------------------------
+    #   Second Descent Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------ 
+    segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "decent_2" 
+    segment.analyses.extend( analyses.landing ) 
+    segment.altitude_start            = 4500. * Units.meter # 7620.  * Units.meter
+    segment.altitude_end              = 1000  * Units.meter
+    segment.air_speed                 = 140. * Units['mph']  
+    segment.climb_rate                = - 500.  * Units['ft/min']  
+    
+    # add to misison
+    mission.append_segment(segment) 
     # ------------------------------------------------------------------
     #   Mission definition complete    
     # ------------------------------------------------------------------
@@ -345,216 +445,6 @@ def missions_setup(base_mission):
 def plot_mission(results,line_style='bo-'):
 
     axis_font = {'fontname':'Arial', 'size':'14'}  
-    line_color = 'bo-'    
-    #------------------------------------------------
-    # Plot Flight Conditions 
-    #------------------------------------------------
-    axis_font = {'size':'14'} 
-    fig = plt.figure()
-    fig.set_size_inches(12, 10)
-    for segment in results.segments.values(): 
-        time     = segment.conditions.frames.inertial.time[:,0] / Units.min
-        airspeed = segment.conditions.freestream.velocity[:,0] 
-        theta    = segment.conditions.frames.body.inertial_rotations[:,1,None] / Units.deg
-        
-        x        = segment.conditions.frames.inertial.position_vector[:,0]
-        y        = segment.conditions.frames.inertial.position_vector[:,1]
-        z        = segment.conditions.frames.inertial.position_vector[:,2]
-        altitude = segment.conditions.freestream.altitude[:,0]
-        
-        axes = fig.add_subplot(2,2,1)
-        axes.plot(time, altitude, line_color)
-        axes.set_ylabel('Altitude (m)',axis_font)
-        set_axes(axes)            
-
-        axes = fig.add_subplot(2,2,2)
-        axes.plot( time , airspeed , line_color )
-        axes.set_ylabel('Airspeed (m/s)',axis_font)
-        set_axes(axes)
-
-        axes = fig.add_subplot(2,2,3)
-        axes.plot( time , theta, line_color )
-        axes.set_ylabel('Pitch Angle (deg)',axis_font)
-        axes.set_xlabel('Time (min)',axis_font)
-        set_axes(axes)   
-        
-        axes = fig.add_subplot(2,2,4)
-        axes.plot( time , x/1000, 'bo-') #, time , y, 'go-' , time , z, 'ro-')
-        axes.set_ylabel('Range (km)',axis_font)
-        axes.set_xlabel('Time (min)',axis_font)
-        set_axes(axes)         
-        
-    
-    
-    #------------------------------------------------
-    # Plot Aerodynamic Forces 
-    #------------------------------------------------
-    axis_font = {'size':'14'}
-    fig = plt.figure()
-    fig.set_size_inches(12, 10)
-    
-    for segment in results.segments.values():
-        time   = segment.conditions.frames.inertial.time[:,0] / Units.min
-        Thrust = segment.conditions.frames.body.thrust_force_vector[:,0]  
-        Lift   = -segment.conditions.frames.wind.lift_force_vector[:,2]
-        Drag   = -segment.conditions.frames.wind.drag_force_vector[:,0]          
-        eta    = segment.conditions.propulsion.throttle[:,0]
-
-        axes = fig.add_subplot(2,2,1)
-        axes.plot( time , eta , line_color )
-        axes.set_ylabel('Throttle',axis_font)
-        set_axes(axes)	 
-
-        axes = fig.add_subplot(2,2,2)
-        axes.plot( time , Lift , line_color)
-        axes.set_ylabel('Lift (N)',axis_font)
-        set_axes(axes)
-        
-        axes = fig.add_subplot(2,2,3)
-        axes.plot( time , Thrust , line_color)
-        axes.set_ylabel('Thrust (N)',axis_font)
-        axes.set_xlabel('Time (min)',axis_font)
-        set_axes(axes)
-        
-        axes = fig.add_subplot(2,2,4)
-        axes.plot( time , Drag , line_color)
-        axes.set_ylabel('Drag (N)',axis_font)
-        axes.set_xlabel('Time (min)',axis_font)
-        set_axes(axes)      
-    
-
-    #------------------------------------------------
-    # Plot Aerodynamic Coefficients 
-    #------------------------------------------------
-    axis_font = {'size':'14'}  
-    fig = plt.figure()
-    fig.set_size_inches(12, 10)
-    
-    for segment in results.segments.values(): 
-        time = segment.conditions.frames.inertial.time[:,0] / Units.min
-        cl   = segment.conditions.aerodynamics.lift_coefficient[:,0,None] 
-        cd   = segment.conditions.aerodynamics.drag_coefficient[:,0,None] 
-        aoa  = segment.conditions.aerodynamics.angle_of_attack[:,0] / Units.deg
-        l_d  = cl/cd
-
-        axes = fig.add_subplot(2,2,1)
-        axes.plot( time , aoa , line_color )
-        axes.set_ylabel('Angle of Attack (deg)',axis_font)
-        set_axes(axes)
-
-        axes = fig.add_subplot(2,2,2)
-        axes.plot( time , cl, line_color )
-        axes.set_ylabel('CL',axis_font)
-        set_axes(axes)   
-        
-        axes = fig.add_subplot(2,2,3)
-        axes.plot( time , cd, line_color )
-        axes.set_xlabel('Time (min)',axis_font)
-        axes.set_ylabel('CD',axis_font)
-        set_axes(axes)   
-        
-        axes = fig.add_subplot(2,2,4)
-        axes.plot( time , l_d, line_color )
-        axes.set_xlabel('Time (min)',axis_font)
-        axes.set_ylabel('L/D',axis_font)
-        set_axes(axes)            
-
-    
-    #------------------------------------------------    
-    # Drag Components
-    #------------------------------------------------
-    axis_font = {'size':'14'} 
-    fig    = plt.figure()
-    fig.set_size_inches(12, 10)     
-    axes = fig.add_subplot(1,1,1) 
-    
-    for i, segment in enumerate(results.segments.values()):
-        time   = segment.conditions.frames.inertial.time[:,0] / Units.min
-        drag_breakdown = segment.conditions.aerodynamics.drag_breakdown
-        cdp = drag_breakdown.parasite.total[:,0]
-        cdi = drag_breakdown.induced.total[:,0]
-        cdc = drag_breakdown.compressible.total[:,0]
-        cdm = drag_breakdown.miscellaneous.total[:,0]
-        cd  = drag_breakdown.total[:,0]
-        
-        axes.plot( time , cdp , 'ko-', label='CD parasite' )
-        axes.plot( time , cdi , line_color, label='CD induced' )
-        axes.plot( time , cdc , 'go-', label='CD compressibility' )
-        axes.plot( time , cdm , 'yo-', label='CD miscellaneous' )
-        axes.plot( time , cd  , 'ro-', label='CD total'   )            
-        if i == 0: 
-            axes.legend(loc='upper center')   
-            
-    axes.set_xlabel('Time (min)',axis_font)
-    axes.set_ylabel('CD',axis_font)
-    axes.grid(True)  
-
-    #------------------------------------------------    
-    # Plot Altitude, sfc, vehicle weight 
-    #------------------------------------------------
-    axis_font = {'size':'14'} 
-    fig = plt.figure()
-    fig.set_size_inches(10, 8) 
-    for segment in results.segments.values(): 
-        time     = segment.conditions.frames.inertial.time[:,0] / Units.min 
-        mass     = segment.conditions.weights.total_mass[:,0] / Units.lb
-        altitude = segment.conditions.freestream.altitude[:,0] / Units.ft
-        mdot     = segment.conditions.weights.vehicle_mass_rate[:,0]
-        thrust   =  segment.conditions.frames.body.thrust_force_vector[:,0]
-        sfc      = (mdot / Units.lb) / (thrust /Units.lbf) * Units.hr
-
-        axes = fig.add_subplot(3,1,1)
-        axes.plot( time , altitude , line_color)
-        axes.set_ylabel('Altitude (ft)',axis_font)
-        set_axes(axes)
-
-        axes = fig.add_subplot(3,1,3)
-        axes.plot( time , sfc , line_color )
-        axes.set_xlabel('Time (min)',axis_font)
-        axes.set_ylabel('sfc (lb/lbf-hr)',axis_font)
-        set_axes(axes)
-
-        axes = fig.add_subplot(3,1,2)
-        axes.plot( time , mass , 'ro-' )
-        axes.set_ylabel('Weight (lb)',axis_font)
-        set_axes(axes)
-        
-    
-    #------------------------------------------------
-    # Plot Velocities 
-    #------------------------------------------------  
-    axis_font = {'size':'14'}  
-    fig = plt.figure()
-    fig.set_size_inches(10, 8) 
-    for segment in results.segments.values(): 
-        time     = segment.conditions.frames.inertial.time[:,0] / Units.min 
-        velocity = segment.conditions.freestream.velocity[:,0] 
-        density  = segment.conditions.freestream.density[:,0]
-        EAS      = velocity * np.sqrt(density/1.225)
-        mach     = segment.conditions.freestream.mach_number[:,0]
-
-        axes = fig.add_subplot(3,1,1)
-        axes.plot( time , velocity / Units.kts, line_color)
-        axes.set_ylabel('velocity (kts)',axis_font)
-        set_axes(axes)
-
-        axes = fig.add_subplot(3,1,2)
-        axes.plot( time , EAS / Units.kts, line_color)
-        axes.set_xlabel('Time (min)',axis_font)
-        axes.set_ylabel('Equivalent Airspeed',axis_font)
-        set_axes(axes)    
-        
-        axes = fig.add_subplot(3,1,3)
-        axes.plot( time , mach , line_color)
-        axes.set_xlabel('Time (min)',axis_font)
-        axes.set_ylabel('Mach',axis_font)
-        set_axes(axes)  
-
-        
-    return
-def plots(results,line_style='bo-'):
-
-    axis_font = {'fontname':'Arial', 'size':'14'}  
     # Plot Flight Conditions 
     plot_flight_conditions(results, line_style)
     
@@ -575,6 +465,10 @@ def plots(results,line_style='bo-'):
 
         
     return
+
+
+
+
 def set_axes(axes):
     """This sets the axis parameters for all plots
     """       
@@ -590,3 +484,4 @@ def set_axes(axes):
 if __name__ == '__main__': 
     main()    
     plt.show()
+    e = 1.
