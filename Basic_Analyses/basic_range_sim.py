@@ -1,6 +1,5 @@
 """
-Range analysis for battery-electric transport aircraft
-(based on Cessna 208B Caravan)
+Range analysis tools for parametric studies of battery-electric transport aircraft
 
     Nick Goodson
     Jan 2021
@@ -11,7 +10,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from scipy import integrate
 import pdb
-import argparse
 
 
 ### Environment Parameters ###
@@ -21,88 +19,80 @@ density_msl = 1.225  # [kg/m^3]
 temp_msl = 288.16  # [K]
 
 
-### Aircraft Parameters ###
-class Cessna208:
+class RangeAnalysis:
 
-    # mass
-    turbo_prop_mass = 122.5  # [kg]  P & W PT6A-6
-    dry_mass = 2145  # [kg]
-    fuel_mass = 1009  # [kg] 
-    MTOW = 3629  # [kg] maximum takeoff weight
+    def __init__(self, aircraft, verbose=False):
+        self.aircraft = aircraft
+        self.verbose = verbose
 
-    # aero
-    wingspan = 15.87  # [m]
-    wing_area = 25.96 # [m^2]
-    wing_efficiency = 0.8  # Oswald efficiency factor
-    drag_coeff_parasitic = 0.034  # estimate for small AoA
+    def parametricStudy1D(self, parameter, values):
+        """
+        Perform a parametric analysis of a single variable taking on specified values
+        """
+        flight_ranges = np.zeros(len(values))
+        for i, val in enumerate(values):
+            try:
+                setattr(self.aircraft, parameter, val)
+            except AttributeError:
+                print(f"Error: {parameter1} is not an attribute of {type(self.aircraft).__name__}")
+                return
+            flight_ranges[i] = flightRange(aircraft, verbose=self.verbose)
+        self.visualize1D(flight_ranges)
+        return flight_ranges
 
-    # performance
-    cruise_speed = 344 / 3.6  # [m/s]
-    cruise_ceiling = 7500  # [km]
-    climb_rate = 6.27  # [m/s]
-    takeoff_distance = 626  # [m]
-    standard_range = 1982e3  # [m]
+    def parametricStudy2D(self, parameterA, valuesA, parameterB, valuesB):
+        """
+        Perform a parameteric analysis of two variables taking on specified values
+        """
+        flight_ranges = np.zeros((len(valuesA), len(valuesB)))
+        for i, valA in enumerate(valuesA):
+            for j, valB in enumerate(valuesB):
+                try:
+                    setattr(self.aircraft, parameterA, valA)
+                    setattr(self.aircraft, parameterB, valB)
+                except AttributeError:
+                    print(f"Error: One of [{parameterA}, {parameterB}] is not an attribute of {type(self.aircraft).__name__}")
+                    return
+            flight_ranges[i, j] = flightRange(aircraft, verbose=self.verbose)
+        self.visualize2D(flight_ranges)
+        return flight_ranges
 
-    # Propulsion
-    engine_max_power = 503e3  # [W]
-    prop_efficiency = 0.85
-    prop_diameter = 2.69  # [m] guesstimate
+    def visualize1D(self, flight_ranges, parameter, values):
+        """
+        Make a standard plot of 1D parametric sim results
+        """
+        range_kms = flight_ranges / 1000
+        fig, ax = plt.subplots(figsize=(8,10), '-k')
+        ax.plot(values, range_kms, l)
+        ax.grid(True)
+        ax.set_xlabel(parameter)
+        ax.set_ylabel("Range [km]")
+        plt.show()
 
-    def __init__(self, cargo_mass=0):
-        self.cargo_mass = cargo_mass
+    def visualize2D(self, flight_ranges, parameterA, valuesA, parameterB, valuesB):
+        """
+        Make some standard plots of 2D parametric sim results
+        """
+        range_kms = flight_ranges / 1000
 
+        # contours
+        fig1, ax1 = plt.subplots(figsize=(8,10))
+        CF1 = ax1.contourf(valuesA, valuesB, range_kms)
+        ax1.set_xlabel(parameterA)
+        ax1.set_ylabel(parameterB)
+        cbar = fig1.colorbar(CF1)
+        cbar.ax.set_ylabel("Range [km]")
 
-class ElectricCessna(Cessna208):
-
-    def __init__(self, cargo_mass=0, battery_mass=None, energy_density=180):
-        super().__init__(cargo_mass)
-        # propulsion
-        self.energy_density = energy_density  # [Wh/kg]
-        self.battery_mass = battery_mass if battery_mass else self.fuel_mass  # [kg]
-
-    @property
-    def total_mass(self):
-        _total_mass = self.dry_mass + self.battery_mass + self.cargo_mass 
-        return _total_mass
-
-    @property
-    def battery_capacity(self):
-        _battery_capacity = self.battery_mass * self.energy_density # [Wh]
-        return _battery_capacity
-
-
-def main(*args):
-
-    aircraft = ElectricCessna()
-
-    n_points = 20
-    cargo_masses = np.linspace(10, 1500, n_points)
-    battery_masses = np.linspace(200, 1000, n_points)
-
-    flight_ranges = np.zeros((n_points, n_points))
-    for i, cargo in enumerate(cargo_masses):
-        for j, battery in enumerate(battery_masses):
-            aircraft.cargo_mass = cargo
-            aircraft.battery_mass = battery
-            flight_ranges[i, j] = flightRange(aircraft, verbose=args[0])
-
-    # Visualize results
-    range_kms = flight_ranges / 1000
-    fig1, ax1 = plt.subplots(figsize=(8,10))
-    ax1.contourf(cargo_masses, battery_masses, range_kms)
-    ax1.set_ylabel("Cargo mass [kg]")
-    ax1.set_xlabel("Battery mass [kg]")
-    plt.show()
-
-    fig = plt.figure()
-    ax2 = fig.gca(projection='3d')
-    CM, BM = np.meshgrid(cargo_masses, battery_masses, indexing='ij') 
-    surf = ax2.plot_surface(CM, BM, range_kms, 
-                        cmap=cm.coolwarm, linewidth=0, antialiased=False)
-    ax2.set_xlabel("Cargo mass [kg]")
-    ax2.set_ylabel("Battery mass [kg]")
-    ax2.set_zlabel("Range [km]")
-    plt.show()
+        # 3D surface
+        fig2 = plt.figure(figsize=(8,10))
+        ax2 = fig2.gca(projection='3d')
+        VA, VB = np.meshgrid(valuesA, valuesB, indexing='ij') 
+        surf = ax2.plot_surface(VA, VB, range_kms, 
+                            cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        ax2.set_xlabel(parameterA)
+        ax2.set_ylabel(parameterB)
+        ax2.set_zlabel("Range [km]")
+        plt.show()
 
 
 def airDensity(altitude):
@@ -127,16 +117,16 @@ def optimalAltitude(cfg):
     (induced drag = parasitic drag)
     """
     lift = cfg.total_mass * gravity
-    optimum_dynamic_pressure = 0.5 * np.sqrt((4 * lift ** 2) / (cfg.wing_area * 
+    optimal_dynamic_pressure = 0.5 * np.sqrt((4 * lift ** 2) / (cfg.wing_area * 
                             cfg.drag_coeff_parasitic * np.pi * cfg.wing_efficiency * cfg.wingspan ** 2))
-    density = 2 * optimum_density / (cfg.cruise_speed ** 2)
-    temperature = temp_msl * (density / density_msl) ** (-1 / (gravity / (temp_gradient * R) + 1))
+    density = 2 * optimal_dynamic_pressure / (cfg.cruise_speed ** 2)
     temp_gradient = (216.7 - temp_msl) / 11000
+    temperature = temp_msl * (density / density_msl) ** (-1 / (gravity / (temp_gradient * R) + 1))
     optimal_altitude = (temperature - temp_msl) / temp_gradient
 
     if optimal_altitude > cfg.cruise_ceiling:
         print("Cruise ceiling exceeded")
-        # optimal_altitude = cfg.cruise_ceiling
+        optimal_altitude = cfg.cruise_ceiling
     return optimal_altitude
 
 
@@ -144,6 +134,7 @@ def inducedDrag(dynamic_pressure, cfg):
     """
     Compute the induced drag
     """
+    aspect_ratio = (cfg.wingspan ** 2) / cfg.wing_area
     lift_coeff = cfg.total_mass * gravity / (dynamic_pressure * cfg.wing_area)
     drag_coeff_induced =  (lift_coeff ** 2) / (np.pi * aspect_ratio * cfg.wing_efficiency)
     return drag_coeff_induced
@@ -154,8 +145,9 @@ def takeoffSpeed(cfg):
     Computes required speed for takeoff from estimate of the lift coefficient
     """
     angle_of_attack = 15 * (np.pi / 180)  # [rad]
-    CL0 = 2 * np.pi * angle_of_attack 
-    lift_coefficient = CL0 / (1 + CL0 / (np.pi * cfg.wing_efficiency * cfg.aspect_ratio))
+    CL0 = 2 * np.pi * angle_of_attack
+    aspect_ratio = (cfg.wingspan ** 2) / cfg.wing_area
+    lift_coefficient = CL0 / (1 + CL0 / (np.pi * cfg.wing_efficiency * aspect_ratio))
     speed = np.sqrt(cfg.total_mass * gravity / (0.5 * airDensity(1) * lift_coefficient * cfg.wing_area))
     return speed
 
@@ -163,7 +155,7 @@ def takeoffSpeed(cfg):
 def takeoffEnergy(takeoff_speed, cfg):
     """
     Estimate the energy usage in takeoff from takeoff distance and engine specs
-    Thrust computation is an approximation assuming a very low free-stream velocity
+    Thrust approximation assumes very low free-stream velocity
     """
     density = airDensity(1)
     thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
@@ -179,17 +171,29 @@ def climbEnergy(cruise_altitude, takeoff_speed, cfg):
     """
     climb_time = cruise_altitude / cfg.climb_rate
 
-    def thrust_power(time):
-        speed = (cfg.cruise_speed / climb_time) * time + takeoff_speed # linear profile
+    def climbPower(time):
+        speed = (cfg.cruise_speed / climb_time) * time + takeoff_speed  # linear profile
         altitude = cfg.climb_rate * time
         density = airDensity(altitude)
-        drag = (cfg.drag_coeff_parasitic + inducedDrag(altitude, speed, cfg)) * cfg.wing_area * dynamicPressure(density, speed)
+        dynamic_pressure = dynamicPressure(density, speed)
+        drag = (cfg.drag_coeff_parasitic + inducedDrag(dynamic_pressure, cfg)) * cfg.wing_area * dynamic_pressure
         thrust = drag + cfg.total_mass * gravity * cfg.climb_rate / speed
         power = thrust * speed
         return power
 
-    climb_energy = integrate.quad(thrust_power, 0, climb_time)
+    climb_energy = integrate.quad(climbPower, 0, climb_time)
     return climb_energy
+
+
+def cruisePower(cruise_altitude, cfg):
+    """
+    Compute power usage during cruise at a specified altitude
+    """
+    density = airDensity(cruise_altitude)
+    dynamic_pressure = dynamicPressure(density, cfg.cruise_speed)
+    drag = cfg.wing_area * dynamic_pressure * (inducedDrag(dynamic_pressure, cfg) + cfg.drag_coeff_parasitic)  # [N]
+    cruise_power = drag * cfg.cruise_speed  # [W]
+    return cruise_power
 
 
 def flightRange(cfg, verbose=True):
@@ -198,7 +202,6 @@ def flightRange(cfg, verbose=True):
     climb and cruise
     """
     total_weight = cfg.total_mass * gravity  # [N]
-    aspect_ratio = (cfg.wingspan ** 2) / cfg.wing_area
     energy_stored = cfg.battery_capacity * 3600  # [J]
 
     # takeoff
@@ -212,11 +215,7 @@ def flightRange(cfg, verbose=True):
     energy_stored -= climb_energy
 
     # cruise
-    cruise_altitude = optimalAltitude(cfg)
-    density = airDensity(cruise_altitude)
-    drag_coeff_induced = inducedDrag(cruise_altitude, cfg.cruise_speed, cfg)
-    drag = cfg.wing_area * dynamicPressure(density, cfg.cruise_speed) * (drag_coeff_induced + cfg.drag_coeff_parasitic)  # [N]
-    cruise_power = drag * cfg.cruise_speed  # [W]
+    cruise_power = cruisePower(cruise_altitude, cfg)  # [W]
     flight_range = cfg.cruise_speed * energy_stored / cruise_power
 
     if verbose:
@@ -227,11 +226,7 @@ def flightRange(cfg, verbose=True):
     return flight_range
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-v", "--verbose", action='store_true')
-    args = parser.parse_args()
-    main(args.verbose)
+
 
 
 
