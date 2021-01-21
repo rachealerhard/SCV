@@ -43,10 +43,10 @@ def vehicle_setup_electric():
     # ------------------------------------------------------------------    
 
     # mass properties
-    vehicle.mass_properties.max_takeoff     = 3985. * Units.kilogram
-    vehicle.mass_properties.takeoff         = 3985. * Units.kilogram
-    vehicle.mass_properties.operating_empty = 2533. * Units.kilogram
-    vehicle.mass_properties.max_zero_fuel   = 2533. * Units.kilogram
+    vehicle.mass_properties.max_takeoff     = 3985. * Units.kilogram 
+    vehicle.mass_properties.takeoff         = 3985. * Units.kilogram 
+    vehicle.mass_properties.operating_empty = 2533. * Units.kilogram 
+    vehicle.mass_properties.max_zero_fuel   = 2533. * Units.kilogram 
     vehicle.mass_properties.cargo           = 1451. * Units.kilogram 
 
     # envelope properties
@@ -102,7 +102,7 @@ def vehicle_setup_electric():
 
     # add to vehicle
     vehicle.append_component(wing)
-
+    
 
     # ------------------------------------------------------------------        
     #  Horizontal Stabilizer
@@ -269,7 +269,7 @@ def vehicle_setup_electric():
     
     # Component: Battery
     bat = SUAVE.Components.Energy.Storages.Batteries.Constant_Mass.Lithium_Ion()
-    bat.mass_properties.mass = 1009 * Units.kg
+    bat.mass_properties.mass = 1009 * Units.kg 
     bat.specific_energy      = 190. * Units.Wh/Units.kg
     bat.resistance           = 0.006
     bat.max_voltage          = 500.
