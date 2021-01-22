@@ -4,12 +4,13 @@ Simulation of an electric Cessna 208B Caravan
     Nick Goodson
     Jan 2021
 """
-
 import argparse
-from basic_range_sim import flightRange
+import numpy as np
+
+from basic_range_sim import RangeAnalysis
 
 
-### Aircraft Parameters ###
+### Aircraft ###
 class Cessna208:
 
     # mass
@@ -61,21 +62,19 @@ class ElectricCessna(Cessna208):
 
 def main(*args):
 
-    aircraft = ElectricCessna()
+    cargo_mass = 300  # [kg]
+    aircraft = ElectricCessna(cargo_mass)
+    analysis = RangeAnalysis(aircraft, verbose=args[0])
 
-    n_points = 20
-    battery_masses = np.linspace(200, 1000, n_points)  # [kg]
-    cruise_speeds = np.linspace(80, 200, n_points)  # [m/s]
+    # battery mass
+    battery_masses = np.linspace(50, 500, 20)
+    battery_range = analysis.parametricStudy1D("battery_mass", battery_masses)
 
-    flight_ranges = np.zeros((n_points, n_points))
-    for i, cargo in enumerate(cargo_masses):
-        for j, battery in enumerate(battery_masses):
-            aircraft.cargo_mass = cargo
-            aircraft.battery_mass = battery
-            flight_ranges[i, j] = flightRange(aircraft, verbose=args[0])
-
-    # Visualize results
-
+    # battery mass and cruise speed
+    cruise_speeds = np.linspace(80, 200, 20)
+    range_tradeoff = analysis.parametricStudy2D("cruise_speed", cruise_speeds,
+                                                "battery_mass", battery_masses)
+    
 
 
 if __name__ == "__main__":

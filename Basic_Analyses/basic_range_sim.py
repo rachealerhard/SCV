@@ -36,8 +36,8 @@ class RangeAnalysis:
             except AttributeError:
                 print(f"Error: {parameter1} is not an attribute of {type(self.aircraft).__name__}")
                 return
-            flight_ranges[i] = flightRange(aircraft, verbose=self.verbose)
-        self.visualize1D(flight_ranges)
+            flight_ranges[i] = flightRange(self.aircraft, verbose=self.verbose)
+        self.visualize1D(flight_ranges, parameter, values)
         return flight_ranges
 
     def parametricStudy2D(self, parameterA, valuesA, parameterB, valuesB):
@@ -53,8 +53,8 @@ class RangeAnalysis:
                 except AttributeError:
                     print(f"Error: One of [{parameterA}, {parameterB}] is not an attribute of {type(self.aircraft).__name__}")
                     return
-            flight_ranges[i, j] = flightRange(aircraft, verbose=self.verbose)
-        self.visualize2D(flight_ranges)
+            flight_ranges[i, j] = flightRange(self.aircraft, verbose=self.verbose)
+        self.visualize2D(flight_ranges, parameterA, valuesA, parameterB, valuesB)
         return flight_ranges
 
     def visualize1D(self, flight_ranges, parameter, values):
@@ -62,8 +62,8 @@ class RangeAnalysis:
         Make a standard plot of 1D parametric sim results
         """
         range_kms = flight_ranges / 1000
-        fig, ax = plt.subplots(figsize=(8,10), '-k')
-        ax.plot(values, range_kms, l)
+        fig, ax = plt.subplots(figsize=(8,10))
+        ax.plot(values, range_kms, '-k')
         ax.grid(True)
         ax.set_xlabel(parameter)
         ax.set_ylabel("Range [km]")
@@ -100,7 +100,8 @@ def airDensity(altitude):
     Standard atmospheric model (capped at 11 km ~ 35,000 ft)
     """
     if altitude > 11000:
-        raise ValueError("altitude cannot exceed 11 km")
+        # raise ValueError("altitude cannot exceed 11 km")
+        print("Warning altitude exceeds 11 km")
     temp_gradient = (216.7 - temp_msl) / 11000
     temperature = altitude * temp_gradient + temp_msl
     density = density_msl * (temperature / temp_msl) ** -(gravity / (temp_gradient * R) + 1)
@@ -126,7 +127,7 @@ def optimalAltitude(cfg):
 
     if optimal_altitude > cfg.cruise_ceiling:
         print("Cruise ceiling exceeded")
-        optimal_altitude = cfg.cruise_ceiling
+        # optimal_altitude = cfg.cruise_ceiling
     return optimal_altitude
 
 
@@ -181,7 +182,7 @@ def climbEnergy(cruise_altitude, takeoff_speed, cfg):
         power = thrust * speed
         return power
 
-    climb_energy = integrate.quad(climbPower, 0, climb_time)
+    climb_energy = integrate.quad(climbPower, 0, climb_time)[0]
     return climb_energy
 
 
