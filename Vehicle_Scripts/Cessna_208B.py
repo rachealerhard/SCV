@@ -12,6 +12,7 @@ import SUAVE
 from SUAVE.Core import Units, Data
 from SUAVE.Plots.Mission_Plots import *
 
+# Use Cessna 208B IC Aircraft:
 from vehicle_setup_Cessna208B import vehicle_setup
 
 
@@ -24,6 +25,7 @@ import pylab as plt
 # ----------------------------------------------------------------------
 
 def main():
+    
     # Setup the vehicle and analyses
     configs, analyses = full_setup()
 
@@ -109,13 +111,6 @@ def base_analysis(vehicle):
     analyses.append(aerodynamics)
 
     # ------------------------------------------------------------------
-    #  Stability Analysis
-    stability = SUAVE.Analyses.Stability.Fidelity_Zero()    
-    #stability.settings.spanwise_vortex_density                  = 3
-    stability.geometry = vehicle
-    analyses.append(stability)
-
-    # ------------------------------------------------------------------
     #  Energy
     energy= SUAVE.Analyses.Energy.Energy()
     energy.network = vehicle.propulsors 
@@ -132,7 +127,6 @@ def base_analysis(vehicle):
     atmosphere.features.planet = planet.features
     analyses.append(atmosphere)   
 
-    # done!
     return analyses    
 
 
@@ -206,26 +200,105 @@ def simple_sizing(configs):
     # diff the new data
     base.store_diff()
 
-    # ------------------------------------------------------------------
-    #   Landing Configuration
-    # ------------------------------------------------------------------
-    landing = configs.landing
-
-    # make sure base data is current
-    landing.pull_base()
-
-    # landing weight
-    landing.mass_properties.landing = 0.85 * base.mass_properties.takeoff
-
-    # diff the new data
-    landing.store_diff()
-
-    # done!
     return
 
 # ----------------------------------------------------------------------
 #   Define the Mission
 # ----------------------------------------------------------------------
+def mission_setup_2(analyses,vehicle):
+
+    # ------------------------------------------------------------------
+    #   Initialize the Mission
+    # ------------------------------------------------------------------
+
+    mission = SUAVE.Analyses.Mission.Sequential_Segments()
+    mission.tag = 'the_mission'
+
+    #airport
+    airport = SUAVE.Attributes.Airports.Airport()
+    airport.altitude   =  0.0  * Units.ft
+    airport.delta_isa  =  0.0
+    airport.atmosphere = SUAVE.Attributes.Atmospheres.Earth.US_Standard_1976()
+
+    mission.airport = airport    
+
+    # unpack Segments module
+    Segments = SUAVE.Analyses.Mission.Segments
+
+    # base segment
+    base_segment = Segments.Segment()
+    
+    # ------------------------------------------------------------------
+    #   First Climb Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------
+
+    segment = Segments.Climb.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "climb_1"
+
+    segment.analyses.extend( analyses.takeoff )
+
+    segment.altitude_start = 0.   * Units.meter
+    segment.altitude_end   = 2000. * Units.meter
+    segment.air_speed      = 125.  * Units.mph
+    segment.climb_rate     = 1000.  * Units['ft/min'] # max climb rate for the Cessna Caravan is 1234 ft/min
+
+    # add to misison
+    mission.append_segment(segment)
+    
+    # ------------------------------------------------------------------
+    #   Second Climb Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------
+
+    segment = Segments.Climb.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "climb_2"
+
+    segment.analyses.extend( analyses.takeoff )
+
+    segment.altitude_start = 2000. * Units.meter
+    segment.altitude_end   = 4500. * Units.meter
+    segment.air_speed      = 150.  * Units.mph
+    segment.climb_rate     = 1000. * Units['ft/min'] # max climb rate for the Cessna Caravan
+
+    # add to misison
+    mission.append_segment(segment)
+     
+
+    # ------------------------------------------------------------------
+    #   First Cruise Segment: constant Speed, constant altitude
+    # ------------------------------------------------------------------
+
+    segment = Segments.Cruise.Constant_Speed_Constant_Altitude(base_segment)
+    segment.tag = "cruise"
+
+    segment.analyses.extend( analyses.cruise )
+
+    segment.altitude  = 4500. * Units.meter # 7620.  * Units.meter
+    segment.air_speed = 180.   * Units.mph
+    segment.distance  = 75.   * Units.kilometer
+
+    # add to misison
+    mission.append_segment(segment)    
+    
+    
+    # ------------------------------------------------------------------
+    #   Descent Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------ 
+    segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "decent" 
+    segment.analyses.extend( analyses.landing ) 
+    segment.altitude_start            = 4500. * Units.meter # 7620.  * Units.meter
+    segment.altitude_end              = 2500  * Units.meter
+    segment.air_speed                 = 140. * Units['mph']  
+    segment.climb_rate                = - 500.  * Units['ft/min']  
+
+    # add to misison
+    mission.append_segment(segment)     
+
+    # ------------------------------------------------------------------
+    #   Mission definition complete    
+    # ------------------------------------------------------------------
+
+    return mission
 
 def mission_setup(analyses,vehicle):
 
@@ -312,12 +385,39 @@ def mission_setup(analyses,vehicle):
     segment.analyses.extend( analyses.cruise )
 
     segment.altitude  = 7620.  * Units.meter
-    segment.air_speed = 214.   * Units.mph
-    segment.distance  = 1900.   * Units.kilometer
+    segment.air_speed = 190.   * Units.mph
+    segment.distance  = 1500.   * Units.kilometer
 
     # add to misison
     mission.append_segment(segment)    
+    
+    # ------------------------------------------------------------------
+    #   First Descent Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------ 
+    segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "decent_1" 
+    segment.analyses.extend( analyses.landing ) 
+    segment.altitude_start            = 7500. * Units.meter # 7620.  * Units.meter
+    segment.altitude_end              = 4500  * Units.meter
+    segment.air_speed                 = 170. * Units['mph']  
+    segment.climb_rate                = - 500.  * Units['ft/min']  
+    
+    # add to misison
+    mission.append_segment(segment)      
 
+    # ------------------------------------------------------------------
+    #   Second Descent Segment: constant Speed, constant rate segment 
+    # ------------------------------------------------------------------ 
+    segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
+    segment.tag = "decent_2" 
+    segment.analyses.extend( analyses.landing ) 
+    segment.altitude_start            = 4500. * Units.meter # 7620.  * Units.meter
+    segment.altitude_end              = 1000  * Units.meter
+    segment.air_speed                 = 140. * Units['mph']  
+    segment.climb_rate                = - 500.  * Units['ft/min']  
+    
+    # add to misison
+    mission.append_segment(segment) 
     # ------------------------------------------------------------------
     #   Mission definition complete    
     # ------------------------------------------------------------------
@@ -342,7 +442,6 @@ def missions_setup(base_mission):
 # ----------------------------------------------------------------------
 #   Plot Mission
 # ----------------------------------------------------------------------
-
 def plot_mission(results,line_style='bo-'):
 
     axis_font = {'fontname':'Arial', 'size':'14'}  
@@ -367,6 +466,22 @@ def plot_mission(results,line_style='bo-'):
         
     return
 
+
+
+
+def set_axes(axes):
+    """This sets the axis parameters for all plots
+    """       
+    axes.minorticks_on()
+    axes.grid(which='major', linestyle='-', linewidth=0.5, color='grey')
+    axes.grid(which='minor', linestyle=':', linewidth=0.5, color='grey')      
+    axes.grid(True)   
+    axes.get_yaxis().get_major_formatter().set_scientific(False)
+    axes.get_yaxis().get_major_formatter().set_useOffset(False)        
+
+    return  
+
 if __name__ == '__main__': 
     main()    
     plt.show()
+    e = 1.
