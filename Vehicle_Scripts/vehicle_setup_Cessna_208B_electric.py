@@ -245,12 +245,12 @@ def vehicle_setup_electric():
     prop.origin              = [[118.* Units.inches,0.0,0.0]]      
     ##prop_attributes.airfoil_geometry       = ["NACA_23012.txt"]
     ##prop_attributes.airfoil_polars         = [["naca23012_50000.txt", "naca23012_100000.txt", "naca23012_200000.txt", "naca23012_500000.txt", "naca23012_1000000.txt"]] 
-    prop.airfoil_geometry = ["Clark_y.txt"]
+    prop.airfoil_geometry = ["Polars\Clark_y.txt"]
     prop.airfoil_polars = [[
-            "Clark_y_polar_Re_100000.txt",
-            "Clark_y_polar_Re_200000.txt",
-            "Clark_y_polar_Re_500000.txt",
-            "Clark_y_polar_Re_1000000.txt",
+            "Polars\Clark_y_polar_Re_100000.txt",
+            "Polars\Clark_y_polar_Re_200000.txt",
+            "Polars\Clark_y_polar_Re_500000.txt",
+            "Polars\Clark_y_polar_Re_1000000.txt",
         ]]    
     polar_stations = np.zeros(20)
     prop.airfoil_polar_stations = list(polar_stations.astype(int))

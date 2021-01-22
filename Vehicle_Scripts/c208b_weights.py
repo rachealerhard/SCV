@@ -25,7 +25,7 @@ import pylab as plt
 
 def main():
     
-    vehicle = vehicle_setup_electric(0.0)
+    vehicle = vehicle_setup_electric()
     
     # Weights settings:
     settings = Data()
