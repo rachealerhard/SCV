@@ -10,6 +10,25 @@ import numpy as np
 from basic_range_sim import RangeAnalysis
 
 
+def main(*args):
+
+    cargo_mass = 300  # [kg]
+    aircraft = ElectricCessna(cargo_mass)
+    analysis = RangeAnalysis(aircraft, verbose=args[0])
+
+    # battery mass
+    battery_masses = np.linspace(50, 1000, 20)
+    battery_ranges = analysis.parametricStudy1D("battery_mass", battery_masses)
+
+    # cruise speed
+    cruise_speeds = np.linspace(80, 200, 20)
+    speed_ranges = analysis.parametricStudy1D("cruise_speed", cruise_speeds)
+
+    # battery mass and cruise speed
+    range_tradeoff = analysis.parametricStudy2D("cruise_speed", cruise_speeds,
+                                                "battery_mass", battery_masses)
+    
+
 ### Aircraft ###
 class Cessna208:
 
@@ -58,23 +77,6 @@ class ElectricCessna(Cessna208):
     def battery_capacity(self):
         _battery_capacity = self.battery_mass * self.energy_density # [Wh]
         return _battery_capacity
-
-
-def main(*args):
-
-    cargo_mass = 300  # [kg]
-    aircraft = ElectricCessna(cargo_mass)
-    analysis = RangeAnalysis(aircraft, verbose=args[0])
-
-    # battery mass
-    battery_masses = np.linspace(50, 500, 20)
-    battery_range = analysis.parametricStudy1D("battery_mass", battery_masses)
-
-    # battery mass and cruise speed
-    cruise_speeds = np.linspace(80, 200, 20)
-    range_tradeoff = analysis.parametricStudy2D("cruise_speed", cruise_speeds,
-                                                "battery_mass", battery_masses)
-    
 
 
 if __name__ == "__main__":

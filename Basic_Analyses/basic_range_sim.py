@@ -46,14 +46,19 @@ class RangeAnalysis:
         """
         flight_ranges = np.zeros((len(valuesA), len(valuesB)))
         for i, valA in enumerate(valuesA):
+            try:
+                setattr(self.aircraft, parameterA, valA)
+            except AttributeError:
+                print(f"Error: {parameterA} is not an attribute of {type(self.aircraft).__name__}")
+                return
+
             for j, valB in enumerate(valuesB):
                 try:
-                    setattr(self.aircraft, parameterA, valA)
                     setattr(self.aircraft, parameterB, valB)
                 except AttributeError:
-                    print(f"Error: One of [{parameterA}, {parameterB}] is not an attribute of {type(self.aircraft).__name__}")
+                    print(f"Error: {parameterB} is not an attribute of {type(self.aircraft).__name__}")
                     return
-            flight_ranges[i, j] = flightRange(self.aircraft, verbose=self.verbose)
+                flight_ranges[j, i] = flightRange(self.aircraft, verbose=self.verbose)
         self.visualize2D(flight_ranges, parameterA, valuesA, parameterB, valuesB)
         return flight_ranges
 
@@ -86,7 +91,7 @@ class RangeAnalysis:
         # 3D surface
         fig2 = plt.figure(figsize=(8,10))
         ax2 = fig2.gca(projection='3d')
-        VA, VB = np.meshgrid(valuesA, valuesB, indexing='ij') 
+        VA, VB = np.meshgrid(valuesA, valuesB, indexing='xy') 
         surf = ax2.plot_surface(VA, VB, range_kms, 
                             cmap=cm.coolwarm, linewidth=0, antialiased=False)
         ax2.set_xlabel(parameterA)
@@ -100,8 +105,7 @@ def airDensity(altitude):
     Standard atmospheric model (capped at 11 km ~ 35,000 ft)
     """
     if altitude > 11000:
-        # raise ValueError("altitude cannot exceed 11 km")
-        print("Warning altitude exceeds 11 km")
+        print("Warning altitude exceeds limit of atmosphere model (11 km)")
     temp_gradient = (216.7 - temp_msl) / 11000
     temperature = altitude * temp_gradient + temp_msl
     density = density_msl * (temperature / temp_msl) ** -(gravity / (temp_gradient * R) + 1)
@@ -126,7 +130,7 @@ def optimalAltitude(cfg):
     optimal_altitude = (temperature - temp_msl) / temp_gradient
 
     if optimal_altitude > cfg.cruise_ceiling:
-        print("Cruise ceiling exceeded")
+        print(f"Cruise ceiling exceeded: {optimal_altitude / 1000:.2f} [km]")
         # optimal_altitude = cfg.cruise_ceiling
     return optimal_altitude
 
@@ -218,6 +222,7 @@ def flightRange(cfg, verbose=True):
     # cruise
     cruise_power = cruisePower(cruise_altitude, cfg)  # [W]
     flight_range = cfg.cruise_speed * energy_stored / cruise_power
+    print(flight_range)
 
     if verbose:
         print(f"\nTakeoff energy: {takeoff_energy / 3600 :<.2f} [Wh]")
