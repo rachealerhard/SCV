@@ -2,7 +2,7 @@
 # 
 # Created:  Jan 2021, R. Erhard
 
-""" setup file for Cessna 208B aircraft
+""" Evaluate the effect of increasing vehicle weight (by adding batteries) on range for fixed cargo load
 """
 
 # ----------------------------------------------------------------------
@@ -11,7 +11,6 @@
 import SUAVE
 from SUAVE.Core import Units, Data
 from SUAVE.Plots.Mission_Plots import *
-from SUAVE.Methods.Performance.electric_payload_range import electric_payload_range # on feature-electric_performance branch
 
 
 # Use converted Cessna 208B Electric Aircraft:
@@ -28,113 +27,142 @@ import pylab as plt
 # ----------------------------------------------------------------------
 
 def main():
+    # For a fixed cargo load, evaluate the mtow/range tradeoff
+    cargo_mass         = 443. * Units.kilogram # fixed
+    structural_mass    = 2533. * Units.kilogram # eventually will scale with increased battery weight after sizing up the wing for the given MTOW
+    base_battery_mass  = 400 *Units.kilogram #1009. * Units.kilogram
+    extra_battery_mass = np.linspace(0.0, 700.0 * Units.kilogram, 8)
     
-    # Electric payload range diagram:
+    # Set specific energy (pre-packing)
+    e_bat = 450. * Units.Wh/Units.kg
     
+    battery_mass = base_battery_mass + extra_battery_mass
+    MTOW = structural_mass + battery_mass + cargo_mass
     
-    # Optimize cruise distance to give 20% battery reserve after mission:
+    range_w_reserve = np.zeros_like(MTOW)
+    
+    for i in range(len(MTOW)):
+        takeoff_mass = MTOW[i]
+        bat_mass     = battery_mass[i]       
+    
+        range_w_reserve[i] = compute_max_range(takeoff_mass,bat_mass,cargo_mass,e_bat)
+    
+    # Plot results:
 
-    x_opt, v_opt, bat_reserve = opt_cruise()
-    
-    
+    fig = plt.figure()
+    axes = fig.add_subplot(1, 1, 1)
+    axes.plot(range_w_reserve/Units.kilometer, MTOW, "o-", color='tab:red', label="Takeoff Mass") 
+    axes.plot(172,3985,label='Direct Convert')
+    axes.set_xlabel("Range [km]")
+    axes.set_ylabel("Takeoff Weight [kg]")
+    axes.set_title("Takeoff Weight vs Range Diagram")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
     ## plt the old results
     #plot_mission(results)
 
 
     return
 
-def opt_cruise():
-    # find cruise distance that optimizes range while leaving 20% battery (10% nonusable, 10% reserve)
-    # bounds of variables:
+def compute_max_range(takeoff_mass,battery_mass, payload,e_bat):
+    # setup vehicle and configs
+    configs, analyses = full_setup(takeoff_mass,battery_mass, payload,e_bat)
+    simple_sizing(configs)
+    configs.finalize()
+    analyses.finalize()      
     
-    x_lb = 40. * Units.kilometer 
-    x_ub = 100. * Units.kilometer
+    # optimize for range by adjusting cruise distance
+    cruise_distance, max_range = cruise_opt(configs, analyses)
     
-    #v_lb = 150. * Units.mph / v_factor
-    #v_ub = 215. * Units.mph / v_factor
+    return max_range
+
+def cruise_opt(configs,analyses):
     
-    #args = 
-    cons = [{'type':'ineq', 'fun': bat_reserve}]
+    x_factor = 1e5
+    
+    # set bounds on cruise distance
+    x_lb = 3. * Units.kilometer / x_factor
+    x_ub = 600. * Units.kilometer / x_factor
+    
+    arguments = (configs,analyses)
+    cons = [{'type':'ineq', 'fun': bat_reserve, 'args':arguments}]
     
     bnds = [(x_lb,x_ub)]
-    tolerance = 1
-    sol = minimize(evaluate_mission_fun, [70 * Units.kilometer], method='SLSQP', bounds=bnds, constraints=cons, tol=tolerance)
+    tolerance = 1e-8
+    sol = minimize(obj_fun, [10. * Units.kilometer / x_factor], method='SLSQP', bounds=bnds, constraints=cons, args=arguments, tol=tolerance,options={'disp': True})
     
     # optimized result
-    x_opt = sol.x[0]
-    range_opt = sol.fun
-    #v_opt = sol.x[1]
-    #bat_reserve = 20. + sol.fun
+    x_opt = sol.x * x_factor
+    range_opt = -sol.fun * x_factor
+    extra_energy = bat_reserve(sol.x,configs,analyses) * x_factor
     
+    print(f"\nMaximum range: {range_opt/1000} [km]")
+    print(f"Cruise distance: {x_opt[0]/1000} [km]")
+    print(f"Remaining energy: {extra_energy} [Wh]")
+    #print(f"Battery mass: {vehicle.propulsors.battery_propeller.battery.mass_properties.mass} [kg]")
     return x_opt, range_opt
 
-def bat_reserve(cruise_params):
-  
-    cruise_distance = cruise_params[0]
-    #cruise_speed    = cruise_params[1] * v_factor
+def obj_fun(x_distance,configs,analyses):
+    x_factor = 1e5
+    x_distance = x_distance[0] * x_factor
     
-    # Setup the vehicle and analyses
-    configs, analyses = full_setup(cruise_distance,cruise_speed=190*Units.mph)
-
-    simple_sizing(configs)
-
-    configs.finalize()
-    analyses.finalize()  
-
-    # mission analysis
+    # set the mission and adjust cruise distance
     mission = analyses.missions.base
-    results = mission.evaluate()    
-    non_usable_bat = 100 * results.segments[-1].conditions.propulsion.battery_energy[-1,0] / results.segments[0].conditions.propulsion.battery_energy[0,0] 
+    mission.segments.cruise.distance = x_distance # first make sure accessing it properly, it should start out as 70 km
     
-    residual = -(10-non_usable_bat) # 10% nonusable battery
-    return residual
-
-def evaluate_mission_fun(cruise_params):  
-    cruise_distance = cruise_params[0]
-    #cruise_speed    = cruise_params[1] * v_factor
+    # analyze the mission
+    results = mission.evaluate()
+    total_range = results.segments[-1].conditions.frames.inertial.position_vector[-1,0]
     
-    # Setup the vehicle and analyses
-    configs, analyses = full_setup(cruise_distance,cruise_speed=190*Units.mph)
+    return -total_range/x_factor
 
-    simple_sizing(configs)
-
-    configs.finalize()
-    analyses.finalize()  
-
-    # mission analysis
+def bat_reserve(x_distance,configs,analyses):
+    x_factor = 1e5
+    x_distance = x_distance[0] * x_factor
+    
+    # set the mission and adjust cruise distance
     mission = analyses.missions.base
+    mission.segments.cruise.distance = x_distance # first make sure accessing it properly, it should start out as 70 km
+    
+    # analyze the mission
     results = mission.evaluate()
 
-    # Check battery energy density at end of mission:
-    battery_reserve_percent = 100 * results.segments[-1].conditions.propulsion.battery_energy[-1,0] / results.segments[0].conditions.propulsion.battery_energy[0,0] 
+    # Check battery energy at end of mission:
+    starting_energy  = results.segments[0].conditions.propulsion.battery_energy[0,0] # not including 11% non-usable energy
+    remaining_energy = results.segments[-1].conditions.propulsion.battery_energy[-1,0]
     
-    # Check total range:
-    mission_range = results.segments[-1].conditions.frames.inertial.position_vector[-1,0]
-    
-    # Check takeoff weight:
-    takeoff_weight = results.segments[0].conditions.weights.total_mass[0,0] # [kg]
-    
-    obj_val = mission_range #- 100000*(abs(20-battery_reserve_percent))
-    return - obj_val # maximize range
-    
-    
+    required_reserve = 0.1 * starting_energy
+    extra_energy   = (remaining_energy - required_reserve)/Units.Wh # >= 0
+    if extra_energy < 0.:
+        print(f"\nConstraint not satisfied, x_distance: {x_distance/1000} [km]")
+        print(f"Extra energy: {extra_energy} [Wh]")
 
+    return extra_energy/x_factor
 # ----------------------------------------------------------------------
 #   Analysis Setup
 # ----------------------------------------------------------------------
 
-def full_setup(cruise_distance,cruise_speed):
+def full_setup(takeoff_mass, battery_mass, payload, e_bat):
 
     # vehicle data
-    vehicle = vehicle_setup()  # prop is optimized for cruise speed
+    vehicle = vehicle_setup(takeoff_mass, battery_mass, payload, e_bat) 
+    
     configs  = configs_setup(vehicle)
 
-    # vehicle analyses
+    # initialize vehicle analyses
     configs_analyses = analyses_setup(configs)
 
     # mission analyses
-    mission  = mission_setup(configs_analyses,vehicle,cruise_distance, cruise_speed)
+    mission  = mission_setup(configs_analyses,vehicle)
+    
+    # adjust cruise distance
+    #
+    
     missions_analyses = missions_setup(mission)
+    
+    # initialize the mission analyses to be performed
 
     analyses = SUAVE.Analyses.Analysis.Container()
     analyses.configs  = configs_analyses
@@ -287,7 +315,7 @@ def simple_sizing(configs):
 #   Define the Mission
 # ----------------------------------------------------------------------
 
-def mission_setup(analyses,vehicle, cruise_distance,cruise_speed):
+def mission_setup(analyses,vehicle):
 
     # ------------------------------------------------------------------
     #   Initialize the Mission
@@ -369,8 +397,8 @@ def mission_setup(analyses,vehicle, cruise_distance,cruise_speed):
     segment.analyses.extend( analyses.cruise )
 
     segment.altitude  = 4500. * Units.meter # 7620.  * Units.meter
-    segment.air_speed = cruise_speed # 180.   * Units.mph
-    segment.distance  = cruise_distance #120.   * Units.kilometer # honolulu to kauai is about 160 km 
+    segment.air_speed = 180.   * Units.mph
+    segment.distance  = 70.   * Units.kilometer # honolulu to kauai is about 160 km 
     segment.state.unknowns.throttle   = 0.9 *  ones_row(1)  
 
     # add to misison
