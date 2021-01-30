@@ -28,7 +28,7 @@ import pylab as plt
 #   Define the Vehicle
 # ----------------------------------------------------------------------
 
-def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
+def vehicle_setup():
     
     # ------------------------------------------------------------------
     #   Initialize the Vehicle
@@ -36,18 +36,19 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
 
     vehicle = SUAVE.Vehicle()
     vehicle.tag = 'Cessna_208B_electric'    
-
+    vehicle.systems.accessories = 'short-range'
+    vehicle.systems.control = 'partially powered'
 
     # ------------------------------------------------------------------
     #   Vehicle-level Properties
     # ------------------------------------------------------------------    
 
     # mass properties
-    vehicle.mass_properties.max_takeoff     = takeoff_mass # 3985. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.takeoff         = takeoff_mass # 3985. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.operating_empty = 2533. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.max_zero_fuel   = 2533. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.cargo           = cargo_mass #1451. * Units.kilogram        # switch to FLOPS outputs
+    vehicle.mass_properties.max_takeoff     = 3985. * Units.kilogram 
+    vehicle.mass_properties.takeoff         = 3985. * Units.kilogram 
+    #vehicle.mass_properties.operating_empty = 2533. * Units.kilogram 
+    #vehicle.mass_properties.max_zero_fuel   = 2533. * Units.kilogram 
+    vehicle.mass_properties.cargo           = 453. * Units.kilogram 
 
     # envelope properties
     vehicle.envelope.limit_load    = 3.8 # airplane designed to withstand 3.8 positive g's before deformation begins
@@ -161,7 +162,7 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
     # Design the Propeller
     prop = SUAVE.Components.Energy.Converters.Propeller()
     prop.number_blades       = 3.0
-    prop.freestream_velocity = 185.   * Units.knots # update to cruise velocity chosen for mission
+    prop.freestream_velocity = 180.   * Units.mph # update to cruise velocity chosen for mission
     prop.angular_velocity    = 1700.  * Units.rpm    # automatically optimized during the mission, so this is default
     prop.design_altitude     = 12000. * Units.feet
     prop.design_thrust       = None #0.0
@@ -182,7 +183,7 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
     prop.symmetry = True
     prop          = propeller_design(prop)  # optimizes the propeller blade twist, thickness, etc.
     
-    airfoil_polars = compute_airfoil_polars(prop.airfoil_geometry, prop.airfoil_polars)
+    airfoil_polars = compute_airfoil_polars(prop,prop.airfoil_geometry, prop.airfoil_polars)
     airfoil_cl_surs = airfoil_polars.lift_coefficient_surrogates
     airfoil_cd_surs = airfoil_polars.drag_coefficient_surrogates
     prop.airfoil_cl_surrogates = airfoil_cl_surs
@@ -193,8 +194,8 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
     
     # Component: Battery
     bat = SUAVE.Components.Energy.Storages.Batteries.Constant_Mass.Lithium_Ion()
-    bat = bat_inputs(bat,battery_mass)
-    bat.specific_energy      = e_bat * 0.8 # weighted by packing factor
+    bat = bat_inputs(bat)
+    bat.specific_energy      = (450 *Units.Wh/Units.kg) * 0.8 # weighted by packing factor
     bat.resistance           = 0.006
     bat.max_voltage          = 500.
     
@@ -377,8 +378,8 @@ def prop_inputs(prop):
     
     return prop    
 
-def bat_inputs(bat, battery_mass):
-    bat.mass_properties.mass = battery_mass #1009 * Units.kg  # optimize how much battery weight we bring to maximize range
+def bat_inputs(bat):
+    bat.mass_properties.mass = 1009 * Units.kg  # optimize how much battery weight we bring to maximize range
     
     return bat
 

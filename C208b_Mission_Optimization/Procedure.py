@@ -13,6 +13,7 @@ from SUAVE.Core import Units
 from SUAVE.Analyses.Process import Process
 from SUAVE.Methods.Power.Battery.Sizing import initialize_from_mass
 from SUAVE.Methods.Propulsion.electric_motor_sizing import size_from_kv
+from SUAVE.Plots.Mission_Plots import *
 
 # ----------------------------------------------------------------------        
 #   Setup
@@ -64,51 +65,19 @@ def simple_mission(nexus):
 def simple_sizing(nexus):
     
     # Pull out the vehicle
-    vec = nexus.vehicle_configurations.base
+    base = nexus.vehicle_configurations.base
     
-    # Change the dynamic pressure based on the, add a factor of safety   
-    vec.envelope.maximum_dynamic_pressure = nexus.missions.mission.segments.cruise.dynamic_pressure*1.2
-    
-    # Scale the horizontal and vertical tails based on the main wing area
-    vec.wings.horizontal_stabilizer.areas.reference = 0.15 * vec.reference_area
-    vec.wings.vertical_stabilizer.areas.reference   = 0.08 * vec.reference_area
-
     # wing spans,areas, and chords
-    for wing in vec.wings:
-        
-        # Unpack
-        AR = wing.aspect_ratio
-        S  = wing.areas.reference
-        
-        # Set the spans
-        wing.spans.projected = np.sqrt(AR*S)
+    for wing in base.wings:
         
         # Set all of the areas for the surfaces
-        wing.areas.wetted   = 2.0 * S
-        wing.areas.exposed  = 1.0 * wing.areas.wetted
-        wing.areas.affected = 1.0 * wing.areas.wetted   
-        
-        # Set all of the chord lengths
-        chord = wing.areas.reference/wing.spans.projected
-        wing.chords.mean_aerodynamic = chord
-        wing.chords.mean_geometric   = chord
-        wing.chords.root             = chord
-        wing.chords.tip              = chord
+        wing.areas.wetted   = 1.75 * wing.areas.reference
+        wing.areas.exposed  = 0.8  * wing.areas.wetted
+        wing.areas.affected = 0.6  * wing.areas.wetted   
 
-    # Size solar panel area
-    wing_area                   = vec.reference_area
-    spanel                      = vec.propulsors.solar_low_fidelity.solar_panel
-    sratio                      = spanel.ratio
-    solar_area                  = wing_area*sratio
-    spanel.area                 = solar_area
-    spanel.mass_properties.mass = solar_area*(0.60 * Units.kg)    
-    
-    # Resize the motor
-    motor = vec.propulsors.solar_low_fidelity.motor
-    motor = size_from_kv(motor)    
-    
+ 
     # diff the new data
-    vec.store_diff()
+    base.store_diff()
 
     return nexus
 
@@ -122,24 +91,20 @@ def weights_battery(nexus):
     config = nexus.analyses.base
     config.weights.evaluate() 
     
-    vec     = nexus.vehicle_configurations.base
-    payload = vec.propulsors.solar_low_fidelity.payload.mass_properties.mass  
-    msolar  = vec.propulsors.solar_low_fidelity.solar_panel.mass_properties.mass
-    MTOW    = vec.mass_properties.max_takeoff
-    empty   = vec.weight_breakdown.empty
-    mmotor  = vec.propulsors.solar_low_fidelity.motor.mass_properties.mass
+    base     = nexus.vehicle_configurations.base
+    payload = base.mass_properties.cargo 
+    MTOW    = base.mass_properties.max_takeoff
+    empty   = base.weight_breakdown.empty
     
     # Calculate battery mass
-    batmass = MTOW - empty - payload - msolar -mmotor
-    bat     = vec.propulsors.solar_low_fidelity.battery
+    batmass = MTOW - empty - payload  #-mmotor
+    bat     = base.propulsors.battery_propeller.battery
     initialize_from_mass(bat,batmass)
-    vec.propulsors.solar_low_fidelity.battery.mass_properties.mass = batmass
+    base.propulsors.battery_propeller.battery.mass_properties.mass = batmass
         
     # Set Battery Charge
-    maxcharge = nexus.vehicle_configurations.base.propulsors.solar_low_fidelity.battery.max_energy
-    charge    = maxcharge
-    
-    nexus.missions.mission.segments.cruise.battery_energy = charge 
+    maxcharge = nexus.vehicle_configurations.base.propulsors.battery_propeller.battery.max_energy
+    nexus.missions.mission.segments[0].battery_energy = maxcharge 
 
     return nexus
     
@@ -160,34 +125,28 @@ def finalize(nexus):
 def post_process(nexus):
     
     # Unpack
-    mis = nexus.missions.mission.segments.cruise
-    vec = nexus.vehicle_configurations.base
-    res = nexus.results.mission.segments.cruise.conditions
+    mis  = nexus.missions.mission.segments.cruise
+    base = nexus.vehicle_configurations.base
+    res  = nexus.results.mission.segments
     
+    # Check total range:
+    mission_range = res[-1].conditions.frames.inertial.position_vector[-1,0]    
+       
     # Final Energy
-    maxcharge    = vec.propulsors.solar_low_fidelity.battery.max_energy
+    maxcharge    = base.propulsors.battery_propeller.battery.max_energy
+    extra_energy = res[-1].conditions.propulsion.battery_energy[-1,0] #(maxcharge - res[-1].conditions.propulsion.battery_energy[-1,0])
     
+    battery_remaining = extra_energy/maxcharge
     # Energy constraints, the battery doesn't go to zero anywhere, using a P norm
     p                    = 8.    
-    energies             = res.propulsion.battery_energy[:,0]/np.abs(maxcharge)
+    energies             = res[-1].conditions.propulsion.battery_energy[:,0]/np.abs(maxcharge)
     energies[energies>0] = 0.0 # Exclude the values greater than zero
     energy_constraint    = np.sum((np.abs(energies)**p))**(1/p) 
-
-    # CL max constraint, it is the same throughout the mission
-    CL = res.aerodynamics.lift_coefficient[0]
-    
-    # Energy constraint:
-    starting_energy  = res.segments[0].conditions.propulsion.battery_energy[0,0]
-    remaining_energy = res.segments[-1].conditions.propulsion.battery_energy[-1,0]
-    required_reserve = 0.1 * starting_energy
-    extra_energy     = (remaining_energy - required_reserve)/Units.Wh # >= 0
     
     # Pack up
     summary = nexus.summary
-    summary.CL                = 1.2 - CL
-    summary.energy_constraint = energy_constraint
-    summary.throttle_min      = res.propulsion.throttle[0]
-    summary.throttle_max      = 0.9 - res.propulsion.throttle[0]
-    summary.nothing           = 0.0
+    summary.base_mission_range    = -mission_range          # maximize range
+    summary.battery_remaining     = 100*(battery_remaining - 0.3) # leaves 30% reserve
     
     return nexus    
+

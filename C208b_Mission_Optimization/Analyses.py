@@ -44,8 +44,7 @@ def base(vehicle):
     # ------------------------------------------------------------------
     #  Weights
     # ------------------------------------------------------------------ 
-    weights = SUAVE.Analyses.Weights.Weights_UAV()
-    weights.settings.empty = SUAVE.Methods.Weights.Correlations.UAV.empty
+    weights = SUAVE.Analyses.Weights.Weights_Transport() #Weights_UAV()
     weights.vehicle = vehicle
     analyses.append(weights)
     

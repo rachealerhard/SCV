@@ -20,7 +20,8 @@ import numpy as np
 def setup(analyses,vehicle):
     
     # the mission container
-    missions = SUAVE.Analyses.Mission.Mission.Container()   
+    missions = SUAVE.Analyses.Mission.Mission.Container() 
+    
     missions.mission = mission(analyses,vehicle)
 
     return missions  
@@ -53,12 +54,12 @@ def mission(analyses,vehicle):
     base_segment.process.iterate.initials.initialize_battery = SUAVE.Methods.Missions.Segments.Common.Energy.initialize_battery
     base_segment.process.iterate.conditions.planet_position  = SUAVE.Methods.skip
     base_segment.state.numerics.number_control_points        = 4
-    base_segment.process.iterate.unknowns.network            = vehicle.propulsors.battery_propeller.unpack_unknowns
-    base_segment.process.iterate.residuals.network           = vehicle.propulsors.battery_propeller.residuals
+    base_segment.process.iterate.unknowns.network            = vehicle.base.propulsors.battery_propeller.unpack_unknowns
+    base_segment.process.iterate.residuals.network           = vehicle.base.propulsors.battery_propeller.residuals
     base_segment.state.unknowns.propeller_power_coefficient  = 0.005 * ones_row(1) 
-    base_segment.state.unknowns.battery_voltage_under_load   = vehicle.propulsors.battery_propeller.battery.max_voltage * ones_row(1)  
+    base_segment.state.unknowns.battery_voltage_under_load   = vehicle.base.propulsors.battery_propeller.battery.max_voltage * ones_row(1)  
     base_segment.state.residuals.network                     = 0. * ones_row(2)             
-    
+    base_segment.battery_energy           = vehicle.base.propulsors.battery_propeller.battery.max_energy
     # ------------------------------------------------------------------
     #   First Climb Segment: constant Speed, constant rate segment 
     # ------------------------------------------------------------------
@@ -72,7 +73,8 @@ def mission(analyses,vehicle):
     segment.altitude_end   = 2000. * Units.meter
     segment.air_speed      = 125.  * Units.mph
     segment.climb_rate     = 1000.  * Units['ft/min'] # max climb rate for the Cessna Caravan is 1234 ft/min
-    segment.battery_energy           = vehicle.propulsors.battery_propeller.battery.max_energy * 0.89
+    #segment.battery_energy           = vehicle.base.propulsors.battery_propeller.battery.max_energy * 0.89
+    #segment.conditions.propulsion.battery_energy = segment.battery_energy
     segment.state.unknowns.throttle  = 0.85 * ones_row(1)  
     
     # add to misison
@@ -101,14 +103,14 @@ def mission(analyses,vehicle):
     #   First Cruise Segment: constant Speed, constant altitude
     # ------------------------------------------------------------------
 
-    segment = Segments.Cruise.Constant_Speed_Constant_Altitude(base_segment)
+    segment = Segments.Cruise.Constant_Dynamic_Pressure_Constant_Altitude(base_segment)
     segment.tag = "cruise"
 
     segment.analyses.extend( analyses.cruise )
 
     segment.altitude  = 4500. * Units.meter # 7620.  * Units.meter
-    segment.air_speed = 180.   * Units.mph
-    segment.distance  = 70.   * Units.kilometer # honolulu to kauai is about 160 km 
+    #segment.air_speed = 180.   * Units.mph
+    #segment.distance  = 70.   * Units.kilometer # honolulu to kauai is about 160 km 
     segment.state.unknowns.throttle   = 0.9 *  ones_row(1)  
 
     # add to misison
@@ -119,7 +121,7 @@ def mission(analyses,vehicle):
     #   Descent Segment: constant Speed, constant rate segment 
     # ------------------------------------------------------------------ 
     segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
-    segment.tag = "decent" 
+    segment.tag = "descent" 
     segment.analyses.extend( analyses.landing ) 
     segment.altitude_start            = 4500. * Units.meter # 7620.  * Units.meter
     segment.altitude_end              = 2500  * Units.meter

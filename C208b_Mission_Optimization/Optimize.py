@@ -17,14 +17,20 @@ import Plot_Mission
 import SUAVE.Optimization.Package_Setups.scipy_setup as scipy_setup
 import SUAVE.Optimization.Package_Setups.pyopt_setup as pyopt_setup
 from SUAVE.Optimization.Nexus import Nexus
-
+import time
 # ----------------------------------------------------------------------        
 #   Run the whole thing
 # ----------------------------------------------------------------------  
 def main():
+    # Finding the maximum range for fixed aircraft and flight 
+    # conditions, leaving 30% battery reserve
     
     problem = setup()
+    
+    start_t = time.time()
     output  = scipy_setup.SciPy_Solve(problem)
+    end_t = (time.time() - start_t)/60 
+    print(f"\nElapsed time: {end_t :.2f} [min]")
     
     problem.translate(output)
 
@@ -48,8 +54,7 @@ def setup():
 
     # [ tag , initial, [lb,ub], scaling, units ]
     problem.inputs = np.array([
-        [ 'cruise_distance'       ,   40 * Units.kilometer, (  1. * Units.kilometer,    600. * Units.kilometer ),  1e5, 1*Units.kilometer      ]])
-        #[ 'cruise_speed'    ,   180 * Units.mph, (  100. * Units.mph,   214.0 * Units.mph ),   80.0, 1*Units.mph       ]])
+        [ 'cruise_distance'  ,   200. , ( 1. , 400.),  1000., Units.km ],])
 
     # -------------------------------------------------------------------
     # Objective
@@ -57,7 +62,7 @@ def setup():
 
     # [ tag, scaling, units ]
     problem.objective = np.array([
-         [ 'range', 200. , 1*Units.kilometer],
+        [ 'mission_range', 100000., Units.meter],
     ])
     
     # -------------------------------------------------------------------
@@ -66,11 +71,7 @@ def setup():
 
     # [ tag, sense, edge, scaling, units ]
     problem.constraints = np.array([
-        [ 'extra_energy', '>', 0.0, 1e5, Units.Wh], # after mission anaysis
-        [ 'battery_mass'     , '>', 0.0, 1.0, Units.kg  ],       
-        [ 'CL'               , '>', 0.0, 1.0, Units.less],
-        [ 'Throttle_min'     , '>', 0.0, 1.0, Units.less],
-        [ 'Throttle_max'     , '>', 0.0, 1.0, Units.less],
+        [ 'battery_remaining', '>', 0.0, 1., Units.less],
     ])
     
     # -------------------------------------------------------------------
@@ -79,18 +80,9 @@ def setup():
     
     # [ 'alias' , ['data.path1.name','data.path2.name'] ]
     problem.aliases = [
-        [ 'wing_area'        ,['vehicle_configurations.*.wings.main_wing.areas.reference',
-                               'vehicle_configurations.base.reference_area']                                ], 
-        [ 'aspect_ratio'     , 'vehicle_configurations.*.wings.main_wing.aspect_ratio'                      ],
-        [ 'kv'               , 'vehicle_configurations.*.propulsors.solar_low_fidelity.motor.speed_constant'           ], 
-        [ 'battery_mass'     , 'vehicle_configurations.base.propulsors.solar_low_fidelity.battery.mass_properties.mass'],
-        [ 'solar_ratio'      , 'vehicle_configurations.*.propulsors.solar_low_fidelity.solar_panel.ratio'              ],
-        [ 'dynamic_pressure' , 'missions.mission.segments.cruise.dynamic_pressure'                          ],  
-        [ 'Nothing'          , 'summary.nothing'                                                            ],
-        [ 'energy_constraint', 'summary.energy_constraint'                                                  ],
-        [ 'CL'               , 'summary.CL'                                                                 ],    
-        [ 'Throttle_min'     , 'summary.throttle_min'                                                       ],
-        [ 'Throttle_max'     , 'summary.throttle_max'                                                       ],
+        [ 'cruise_distance'   , 'missions.mission.segments.cruise.distance'          ],
+        [ 'battery_remaining' , 'summary.battery_remaining'                          ],
+        [ 'mission_range'     , 'summary.base_mission_range'                         ],
     ]      
     
     # -------------------------------------------------------------------
