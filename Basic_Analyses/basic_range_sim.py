@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from scipy import integrate
-import pdb
 
 
 ### Environment Parameters ###
@@ -34,7 +33,7 @@ class RangeAnalysis:
             try:
                 setattr(self.aircraft, parameter, val)
             except AttributeError:
-                print(f"Error: {parameter1} is not an attribute of {type(self.aircraft).__name__}")
+                print(f"Error: {parameter} is not an attribute of {type(self.aircraft).__name__}")
                 return
             flight_ranges[i] = flightRange(self.aircraft, verbose=self.verbose)
         self.visualize1D(flight_ranges, parameter, values)
@@ -62,6 +61,7 @@ class RangeAnalysis:
         self.visualize2D(flight_ranges, parameterA, valuesA, parameterB, valuesB)
         return flight_ranges
 
+    @staticmethod
     def visualize1D(self, flight_ranges, parameter, values):
         """
         Make a standard plot of 1D parametric sim results
@@ -74,6 +74,7 @@ class RangeAnalysis:
         ax.set_ylabel("Range [km]")
         plt.show()
 
+    @staticmethod
     def visualize2D(self, flight_ranges, parameterA, valuesA, parameterB, valuesB):
         """
         Make some standard plots of 2D parametric sim results
@@ -106,6 +107,7 @@ def airDensity(altitude):
     """
     if altitude > 11000:
         print("Warning altitude exceeds limit of atmosphere model (11 km)")
+
     temp_gradient = (216.7 - temp_msl) / 11000
     temperature = altitude * temp_gradient + temp_msl
     density = density_msl * (temperature / temp_msl) ** -(gravity / (temp_gradient * R) + 1)
@@ -116,6 +118,7 @@ def dynamicPressure(density, velocity):
     return 0.5 * density * velocity ** 2
 
 
+#TODO: Optimize for crusie speed and altitude
 def optimalAltitude(cfg):
     """
     Compute the optimal altitude for maximum range at given cruise speed
@@ -131,7 +134,7 @@ def optimalAltitude(cfg):
 
     if optimal_altitude > cfg.cruise_ceiling:
         print(f"Cruise ceiling exceeded: {optimal_altitude / 1000:.2f} [km]")
-        # optimal_altitude = cfg.cruise_ceiling
+
     return optimal_altitude
 
 
@@ -163,7 +166,7 @@ def takeoffEnergy(takeoff_speed, cfg):
     Thrust approximation assumes very low free-stream velocity
     """
     density = airDensity(1)
-    thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) **2) ** (1 / 3)
+    thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) ** 2) ** (1 / 3)
     takeoff_time = takeoff_speed * cfg.total_mass / thrust
     takeoff_energy = takeoff_time * cfg.engine_max_power
     return takeoff_energy 
