@@ -221,7 +221,7 @@ def vehicle_setup():
     prop.symmetry = True
     prop = propeller_design(prop)
 
-    airfoil_polars = compute_airfoil_polars(prop, prop.airfoil_geometry, prop.airfoil_polars)
+    airfoil_polars = compute_airfoil_polars(prop, prop.airfoil_geometry)#, prop.airfoil_polars)
     airfoil_cl_surs = airfoil_polars.lift_coefficient_surrogates
     airfoil_cd_surs = airfoil_polars.drag_coefficient_surrogates
     prop.airfoil_cl_surrogates = airfoil_cl_surs

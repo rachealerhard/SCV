@@ -18,7 +18,7 @@ from SUAVE.Input_Output.OpenVSP.get_vsp_areas import get_vsp_areas
 
 from SUAVE.Plots.Mission_Plots import *
 
-from vehicle_setup_blended_wing_body import vehicle_setup
+from Vehicle_Scripts.vehicle_setup_blended_wing_body import vehicle_setup
 
 
 
@@ -60,7 +60,7 @@ def full_setup():
     configs_analyses = analyses_setup(configs)
 
     # mission analyses
-    mission = mission_setup(configs_analyses)
+    mission = mission_setup(configs_analyses, vehicle)
     missions_analyses = missions_setup(mission)
 
     analyses = SUAVE.Analyses.Analysis.Container()
