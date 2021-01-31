@@ -1,8 +1,7 @@
 # vehicle_setup_blended_wing_body.py
 #
 # Created: Jan 2021, N. Goodson
-#
-# Based on Tutorial by: E. Botero, T. MacDonald
+
 
 """ Setup file for Blended wing body aircraft with same wing loading and TO mass as a Cessna208B Super Cargomaster.
     Aspect ratio and airfoils are based on SUAVE BWB tutorial (itself based on Boeing BWB-450)
@@ -148,12 +147,12 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
 
     prop = prop_inputs(prop)
 
-    prop.airfoil_geometry = ["Polars\Clark_y.txt"]
+    prop.airfoil_geometry = ["Polars/Clark_y.txt"]
     prop.airfoil_polars = [[
-            "Polars\Clark_y_polar_Re_100000.txt",
-            "Polars\Clark_y_polar_Re_200000.txt",
-            "Polars\Clark_y_polar_Re_500000.txt",
-            "Polars\Clark_y_polar_Re_1000000.txt",
+            "Polars/Clark_y_polar_Re_100000.txt",
+            "Polars/Clark_y_polar_Re_200000.txt",
+            "Polars/Clark_y_polar_Re_500000.txt",
+            "Polars/Clark_y_polar_Re_1000000.txt",
         ]]
 
     polar_stations = np.zeros(20)
@@ -172,7 +171,7 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
 
     # Component: Battery
     bat = SUAVE.Components.Energy.Storages.Batteries.Constant_Mass.Lithium_Ion()
-    bat = bat_inputs(bat,battery_mass)
+    bat = bat_inputs(bat, battery_mass)
     bat.specific_energy      = e_bat * 0.8 # weighted by packing factor
     bat.resistance           = 0.006
     bat.max_voltage          = 500.
@@ -193,9 +192,7 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
     io = 4.0
     start_kv = 1
     end_kv = 25
-    # do optimization to find kv or just do a linspace then remove all negative values, take smallest one use 0.05 change
-    # essentially you are sizing the motor for a particular rpm which is sized for a design tip mach
-    # this reduces the bookkeeping errors
+
     possible_kv_vals = np.linspace(start_kv, end_kv, (end_kv - start_kv) * 20 + 1, endpoint=True) * Units.rpm
     res_kv_vals = ((v - omeg / possible_kv_vals) * (1. - etam * v * possible_kv_vals / omeg)) / io
     positive_res_vals = np.extract(res_kv_vals > 0, res_kv_vals)

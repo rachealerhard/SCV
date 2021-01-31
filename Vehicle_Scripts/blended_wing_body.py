@@ -52,8 +52,13 @@ def main():
 # ----------------------------------------------------------------------
 
 def full_setup():
+    takeoff_mass = 3985. * Units.kilogram
+    battery_mass = 1009. * Units.kilogram
+    cargo_mass = 1451. * Units.kilogram
+    e_bat = 450. * Units.Wh / Units.kilogram
+
     # vehicle data
-    vehicle = vehicle_setup()
+    vehicle = vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat)
     configs = configs_setup(vehicle)
 
     # vehicle analyses
@@ -110,16 +115,18 @@ def base_analysis(vehicle):
 
     # aerodynamics.process.compute.lift.inviscid.settings.parallel          = True
     # aerodynamics.process.compute.lift.inviscid.settings.processors        = 12
-    # aerodynamics.process.compute.lift.inviscid.training_file = 'base_data_1500.txt'
+    aerodynamics.process.compute.lift.inviscid.training_file = 'base_data_1500.txt' # TODO: Install OpenVSP, SU2. Gmsh
     aerodynamics.process.compute.lift.inviscid.settings.maximum_iterations = 10
 
     aerodynamics.settings.drag_coefficient_increment = 0.0000
     aerodynamics.settings.half_mesh_flag = False
     aerodynamics.settings.span_efficiency = 0.85
 
-    aerodynamics.process.compute.lift.inviscid.training.Mach = np.array([.1, 0.2, .25])
-    aerodynamics.process.compute.lift.inviscid.training.angle_of_attack = np.array([0., 3., 6.]) * Units.deg
+    # TODO: Install OpenVSP, SU2. Gmsh
+    # aerodynamics.process.compute.lift.inviscid.training.Mach = np.array([.1, 0.2, .25])
+    # aerodynamics.process.compute.lift.inviscid.training.angle_of_attack = np.array([0., 3., 6.]) * Units.deg
 
+    # OpenVSP mesh parameters
     wing_segments = vehicle.wings.main_wing.Segments
     wing_segments.section_1.vsp_mesh = Data()
     wing_segments.section_1.vsp_mesh.inner_radius = 4.
@@ -148,6 +155,12 @@ def base_analysis(vehicle):
     analyses.append(aerodynamics)
 
     # ------------------------------------------------------------------
+    # #  Stability Analysis
+    # stability = SUAVE.Analyses.Stability.Fidelity_Zero()
+    # stability.geometry = vehicle
+    # analyses.append(stability)
+
+    # ------------------------------------------------------------------
     #  Energy
     energy = SUAVE.Analyses.Energy.Energy()
     energy.network = vehicle.propulsors
@@ -164,7 +177,6 @@ def base_analysis(vehicle):
     atmosphere.features.planet = planet.features
     analyses.append(atmosphere)
 
-    # done!
     return analyses
 
 
@@ -173,9 +185,6 @@ def base_analysis(vehicle):
 # ---------------------------------------------------------------------
 
 def configs_setup(vehicle):
-    # ------------------------------------------------------------------
-    #   Initialize Configurations
-    # ------------------------------------------------------------------
 
     configs = SUAVE.Components.Configs.Config.Container()
 
@@ -188,40 +197,20 @@ def configs_setup(vehicle):
     return configs
 
 
-# ----------------------------------------------------------------------
-#   Plot Mission
-# ----------------------------------------------------------------------
-
-def plot_mission(results, line_style='bo-'):
-    # Plot Aerodynamic Forces
-    plot_aerodynamic_forces(results, line_style)
-
-    # Plot Aerodynamic Coefficients
-    plot_aerodynamic_coefficients(results, line_style)
-
-    # Drag Components
-    plot_drag_components(results, line_style)
-
-    # Plot Altitude, sfc, vehicle weight
-    plot_altitude_sfc_weight(results, line_style)
-
-    # Plot Velocities
-    plot_aircraft_velocities(results, line_style)
-
-    return
-
-
 def simple_sizing(configs):
     base = configs.base
     base.pull_base()
 
     # Areas
-    wetted_areas = get_vsp_areas(base.tag)
+    # wetted_areas = get_vsp_areas(base.tag) # TODO: Install OpenVSP
 
     for wing in base.wings:
-        wing.areas.wetted = wetted_areas[wing.tag]
-        wing.areas.exposed = wetted_areas[wing.tag]
-        wing.areas.affected = 0.6 * wing.areas.wetted
+        wing.areas.wetted   = 1.75 * wing.areas.reference
+        wing.areas.exposed  = 0.8  * wing.areas.wetted
+        wing.areas.affected = 0.6  * wing.areas.wetted
+        # wing.areas.wetted = wetted_areas[wing.tag]
+        # wing.areas.exposed = wetted_areas[wing.tag]
+        # wing.areas.affected = 0.6 * wing.areas.wetted
 
         # diff the new data
     base.store_diff()
@@ -273,7 +262,7 @@ def mission_setup(analyses, vehicle):
     segment = Segments.Climb.Constant_Speed_Constant_Rate(base_segment)
     segment.tag = "climb_1"
 
-    segment.analyses.extend(analyses.takeoff)
+    segment.analyses.extend(analyses.base)
 
     segment.altitude_start = 0. * Units.meter
     segment.altitude_end = 2000. * Units.meter
@@ -292,7 +281,7 @@ def mission_setup(analyses, vehicle):
     segment = Segments.Climb.Constant_Speed_Constant_Rate(base_segment)
     segment.tag = "climb_2"
 
-    segment.analyses.extend(analyses.takeoff)
+    segment.analyses.extend(analyses.base)
 
     segment.altitude_start = 2000. * Units.meter
     segment.altitude_end = 4500. * Units.meter
@@ -310,7 +299,7 @@ def mission_setup(analyses, vehicle):
     segment = Segments.Cruise.Constant_Speed_Constant_Altitude(base_segment)
     segment.tag = "cruise"
 
-    segment.analyses.extend(analyses.cruise)
+    segment.analyses.extend(analyses.base)
 
     segment.altitude = 4500. * Units.meter  # 7620.  * Units.meter
     segment.air_speed = 180. * Units.mph
@@ -325,7 +314,7 @@ def mission_setup(analyses, vehicle):
     # ------------------------------------------------------------------
     segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
     segment.tag = "decent"
-    segment.analyses.extend(analyses.landing)
+    segment.analyses.extend(analyses.base)
     segment.altitude_start = 4500. * Units.meter  # 7620.  * Units.meter
     segment.altitude_end = 2500 * Units.meter
     segment.air_speed = 140. * Units['mph']
@@ -334,10 +323,6 @@ def mission_setup(analyses, vehicle):
 
     # add to misison
     mission.append_segment(segment)
-
-    # ------------------------------------------------------------------
-    #   Mission definition complete
-    # ------------------------------------------------------------------
 
     return mission
 
@@ -353,6 +338,72 @@ def missions_setup(base_mission):
     missions.base = base_mission
 
     return missions
+
+
+# ----------------------------------------------------------------------
+#   Plot Mission
+# ----------------------------------------------------------------------
+
+def plot_mission(results, line_style='bo-'):
+    axis_font = {'fontname': 'Arial', 'size': '14'}
+
+    # Plot Flight Conditions
+    plot_flight_conditions(results, line_style)
+
+    # Plot Aerodynamic Coefficients
+    plot_aerodynamic_coefficients(results, line_style)
+
+    # Drag Components
+    plot_drag_components(results, line_style)
+
+    # Plot Aircraft Flight Speed
+    plot_aircraft_velocities(results, line_style)
+
+    # Plot Aircraft Electronics
+    plot_electronic_conditions(results, line_style)
+
+    # Plot Propeller Conditions
+    plot_propeller_conditions(results, line_style)
+
+    # Plot Electric Motor and Propeller Efficiencies
+    plot_eMotor_Prop_efficiencies(results, line_style)
+
+    # Plot propeller Disc and Power Loading
+    plot_disc_power_loading(results, line_style)
+
+    return
+
+
+# def plot_mission(results, line_style='bo-'):
+#     # Plot Aerodynamic Forces
+#     plot_aerodynamic_forces(results, line_style)
+#
+#     # Plot Aerodynamic Coefficients
+#     plot_aerodynamic_coefficients(results, line_style)
+#
+#     # Drag Components
+#     plot_drag_components(results, line_style)
+#
+#     # Plot Altitude, sfc, vehicle weight
+#     plot_altitude_sfc_weight(results, line_style)
+#
+#     # Plot Velocities
+#     plot_aircraft_velocities(results, line_style)
+#
+#     return
+
+
+def set_axes(axes):
+    """This sets the axis parameters for all plots
+    """
+    axes.minorticks_on()
+    axes.grid(which='major', linestyle='-', linewidth=0.5, color='grey')
+    axes.grid(which='minor', linestyle=':', linewidth=0.5, color='grey')
+    axes.grid(True)
+    axes.get_yaxis().get_major_formatter().set_scientific(False)
+    axes.get_yaxis().get_major_formatter().set_useOffset(False)
+
+    return
 
 
 if __name__ == '__main__':
