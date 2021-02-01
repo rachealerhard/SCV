@@ -18,7 +18,7 @@ from SUAVE.Input_Output.OpenVSP.get_vsp_areas import get_vsp_areas
 
 from SUAVE.Plots.Mission_Plots import *
 
-from Vehicle_Scripts.vehicle_setup_blended_wing_body import vehicle_setup
+from vehicle_setup_blended_wing_body import vehicle_setup # Vehicle_Scripts.
 
 
 
@@ -110,21 +110,15 @@ def base_analysis(vehicle):
 
     # ------------------------------------------------------------------
     #  Aerodynamics Analysis
-    aerodynamics = SUAVE.Analyses.Aerodynamics.SU2_Euler()
+
+    # aerodynamics = SUAVE.Analyses.Aerodynamics.SU2_Euler()
+    # aerodynamics.geometry = vehicle
+    # aerodynamics.process.compute.lift.inviscid.training_file = 'bwb_base_data.txt'
+
+    aerodynamics = SUAVE.Analyses.Aerodynamics.Fidelity_Zero()
     aerodynamics.geometry = vehicle
-
-    # aerodynamics.process.compute.lift.inviscid.settings.parallel          = True
-    # aerodynamics.process.compute.lift.inviscid.settings.processors        = 12
-    aerodynamics.process.compute.lift.inviscid.training_file = 'base_data_1500.txt' # TODO: Install OpenVSP, SU2. Gmsh
-    aerodynamics.process.compute.lift.inviscid.settings.maximum_iterations = 10
-
     aerodynamics.settings.drag_coefficient_increment = 0.0000
-    aerodynamics.settings.half_mesh_flag = False
-    aerodynamics.settings.span_efficiency = 0.85
-
-    # TODO: Install OpenVSP, SU2. Gmsh
-    # aerodynamics.process.compute.lift.inviscid.training.Mach = np.array([.1, 0.2, .25])
-    # aerodynamics.process.compute.lift.inviscid.training.angle_of_attack = np.array([0., 3., 6.]) * Units.deg
+    analyses.append(aerodynamics)
 
     # OpenVSP mesh parameters
     wing_segments = vehicle.wings.main_wing.Segments
@@ -155,10 +149,10 @@ def base_analysis(vehicle):
     analyses.append(aerodynamics)
 
     # ------------------------------------------------------------------
-    # #  Stability Analysis
-    # stability = SUAVE.Analyses.Stability.Fidelity_Zero()
-    # stability.geometry = vehicle
-    # analyses.append(stability)
+    #  Stability Analysis
+    stability = SUAVE.Analyses.Stability.Fidelity_Zero()
+    stability.geometry = vehicle
+    analyses.append(stability)
 
     # ------------------------------------------------------------------
     #  Energy
@@ -192,7 +186,7 @@ def configs_setup(vehicle):
     base_config.tag = 'base'
     configs.append(base_config)
 
-    write(vehicle, base_config.tag)
+    # write(vehicle, base_config.tag)  # Write to OpenVSP
 
     return configs
 
@@ -202,7 +196,7 @@ def simple_sizing(configs):
     base.pull_base()
 
     # Areas
-    # wetted_areas = get_vsp_areas(base.tag) # TODO: Install OpenVSP
+    # wetted_areas = get_vsp_areas(base.tag)
 
     for wing in base.wings:
         wing.areas.wetted   = 1.75 * wing.areas.reference

@@ -245,12 +245,12 @@ def vehicle_setup_electric():
     prop.origin              = [[118.* Units.inches,0.0,0.0]]      
     ##prop_attributes.airfoil_geometry       = ["NACA_23012.txt"]
     ##prop_attributes.airfoil_polars         = [["naca23012_50000.txt", "naca23012_100000.txt", "naca23012_200000.txt", "naca23012_500000.txt", "naca23012_1000000.txt"]] 
-    prop.airfoil_geometry = ["Polars\Clark_y.txt"]
+    prop.airfoil_geometry = ["Polars/Clark_y.txt"]
     prop.airfoil_polars = [[
-            "Polars\Clark_y_polar_Re_100000.txt",
-            "Polars\Clark_y_polar_Re_200000.txt",
-            "Polars\Clark_y_polar_Re_500000.txt",
-            "Polars\Clark_y_polar_Re_1000000.txt",
+            "Polars/Clark_y_polar_Re_100000.txt",
+            "Polars/Clark_y_polar_Re_200000.txt",
+            "Polars/Clark_y_polar_Re_500000.txt",
+            "Polars/Clark_y_polar_Re_1000000.txt",
         ]]    
     polar_stations = np.zeros(20)
     prop.airfoil_polar_stations = list(polar_stations.astype(int))
@@ -258,7 +258,7 @@ def vehicle_setup_electric():
     prop.symmetry            = True
     prop          = propeller_design(prop)  
     
-    airfoil_polars = compute_airfoil_polars(prop, prop.airfoil_geometry, prop.airfoil_polars)
+    airfoil_polars = compute_airfoil_polars(prop.airfoil_geometry, prop.airfoil_polars)
     airfoil_cl_surs = airfoil_polars.lift_coefficient_surrogates
     airfoil_cd_surs = airfoil_polars.drag_coefficient_surrogates
     prop.airfoil_cl_surrogates = airfoil_cl_surs
