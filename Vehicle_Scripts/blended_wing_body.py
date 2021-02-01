@@ -113,7 +113,7 @@ def base_analysis(vehicle):
 
     # aerodynamics = SUAVE.Analyses.Aerodynamics.SU2_Euler()
     # aerodynamics.geometry = vehicle
-    # aerodynamics.process.compute.lift.inviscid.training_file = 'bwb_base_data.txt'
+    # aerodynamics.process.compute.lift.inviscid.training_file = 'Polars/bwb_base_data.txt'
 
     aerodynamics = SUAVE.Analyses.Aerodynamics.Fidelity_Zero()
     aerodynamics.geometry = vehicle
@@ -307,7 +307,7 @@ def mission_setup(analyses, vehicle):
     #   Descent Segment: constant Speed, constant rate segment
     # ------------------------------------------------------------------
     segment = Segments.Descent.Constant_Speed_Constant_Rate(base_segment)
-    segment.tag = "decent"
+    segment.tag = "descent"
     segment.analyses.extend(analyses.base)
     segment.altitude_start = 4500. * Units.meter  # 7620.  * Units.meter
     segment.altitude_end = 2500 * Units.meter
