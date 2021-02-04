@@ -50,7 +50,6 @@ def main():
     complexity = 'Simple'
     num_main_wings = 1
     vehicle.wings.main_wing.flap_ratio  = 0.3
-    
     main_wing_weight = wing_weight_FLOPS(vehicle, vehicle.wings.main_wing, WPOD, complexity, settings, num_main_wings)
         
 

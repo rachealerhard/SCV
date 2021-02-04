@@ -45,7 +45,7 @@ class ElectricCessna(Cessna208):
     def __init__(self, cargo_mass):
         super().__init__(cargo_mass)
         # propulsion
-        self.energy_density = 180  # [Wh/kg]
+        self.energy_density = 200  # [Wh/kg]
         self.battery_mass = self.fuel_mass  # [kg]
 
     @property
