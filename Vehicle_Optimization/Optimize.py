@@ -22,16 +22,20 @@ import time
 #   Run the whole thing
 # ----------------------------------------------------------------------  
 def main():
-    # Finding the maximum range for fixed aircraft and flight 
-    # conditions, leaving 30% battery reserve
+    '''
+   
+    '''
     
     problem = setup()
     
     start_t = time.time()
     output  = scipy_setup.SciPy_Solve(problem)
     end_t = (time.time() - start_t)/60 
-    print(f"\nElapsed time: {end_t :.2f} [min]")
-    
+    print(f"\n\n\nElapsed time: {end_t :.2f} [min]")
+    print(f"\nMission range: {problem.summary.mission_range/1000 :.2f} [km]")
+    print(f"\nTotal aircraft weight: {problem.summary.total_weight :.2f} [kg]")
+    print(f"\nBattery mass required: {problem.optimization_problem.inputs[0][1] :.2f} [kg]")
+    print(f"\nPayload: {problem.summary.payload :.2f} [kg]")
     problem.translate(output)
 
     Plot_Mission.plot_mission(problem.results.mission)
@@ -54,7 +58,8 @@ def setup():
 
     # [ tag , initial, [lb,ub], scaling, units ]
     problem.inputs = np.array([
-        [ 'cruise_distance'  ,   200. , ( 1. , 400.),  1000., Units.km ],])
+        [ 'bat_mass'       ,   1500.  , ( 800. , 1600.), 1000.0 , Units.kg      ],        
+        ]) 
 
     # -------------------------------------------------------------------
     # Objective
@@ -62,7 +67,8 @@ def setup():
 
     # [ tag, scaling, units ]
     problem.objective = np.array([
-        [ 'mission_range', 100000., Units.meter],
+        [ 'Nothing', 1.0, Units.kg],
+        #[ 'total_weight', 1.0, Units.kg], 
     ])
     
     # -------------------------------------------------------------------
@@ -71,7 +77,8 @@ def setup():
 
     # [ tag, sense, edge, scaling, units ]
     problem.constraints = np.array([
-        [ 'battery_remaining', '>', 0.0, 1., Units.less],
+        [ 'battery_remaining', '>', 0.30, 1., Units.less],
+        [ 'battery_remaining', '<', 0.35, 1., Units.less],
     ])
     
     # -------------------------------------------------------------------
@@ -80,9 +87,16 @@ def setup():
     
     # [ 'alias' , ['data.path1.name','data.path2.name'] ]
     problem.aliases = [
-        [ 'cruise_distance'   , 'missions.mission.segments.cruise.distance'          ],
-        [ 'battery_remaining' , 'summary.battery_remaining'                          ],
-        [ 'mission_range'     , 'summary.base_mission_range'                         ],
+        #[ 'wing_area'         , 'vehicle_configurations.*.wings.main_wing.areas.reference'  ],
+        #[ 'wing_aspect_ratio' , 'vehicle_configurations.*.wings.main_wing.aspect_ratio'  ],
+        #[ 'wing_sweeps'         , 'vehicle_configurations.*.wings.main_wing.sweeps.quarter_chord'  ], 
+        #[ 'cruise_alt'      , 'missions.mission.segments.cruise.altitude'  ],
+        [ 'bat_mass'    , 'vehicle_configurations.*.mass_properties.battery_mass'  ],
+        [ 'total_weight'    , 'summary.total_weight'  ],
+        #[ 'energy_usage' , 'summary.energy_usage'                    ],
+        [ 'battery_remaining' , 'summary.battery_remaining'                    ],
+        [ 'Nothing'          ,  'summary.nothing'       ]
+        #[ 'mission_time'      , 'summary.mission_range'                         ],
     ]      
     
     # -------------------------------------------------------------------

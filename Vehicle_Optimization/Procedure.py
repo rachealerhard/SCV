@@ -29,17 +29,17 @@ def setup():
     procedure = Process()
     procedure.simple_sizing   = simple_sizing
     
-    # Size the battery and charge it before the mission
+    # compute the vehicle weights, size and charge the battery
     procedure.weights_battery = weights_battery
 
-    # finalizes the data dependencies
+    # finalize the data dependencies
     procedure.finalize        = finalize
     
     # performance studies
     procedure.missions        = Process()
     procedure.missions.base   = simple_mission
     
-    # Post process the results
+    # post-process the results
     procedure.post_process    = post_process
         
     return procedure
@@ -92,16 +92,19 @@ def weights_battery(nexus):
     config.weights.evaluate() 
     
     base     = nexus.vehicle_configurations.base
-    payload = base.mass_properties.cargo 
-    MTOW    = base.mass_properties.max_takeoff
-    empty   = base.weight_breakdown.empty
     
-    # Calculate battery mass
-    batmass = MTOW - empty - payload  #-mmotor
+    empty   = base.weight_breakdown.empty # structural weight; function of vehicle geometry
+    payload = base.mass_properties.max_payload
+    batmass = base.mass_properties.battery_mass
+    
+    MTOW    = empty + payload + batmass #base.weight_breakdown.max_takeoff
+    base.mass_properties.max_takeoff = MTOW
+    
+    # update the battery parameters based on the battery mass
     bat     = base.propulsors.battery_propeller.battery
     initialize_from_mass(bat,batmass)
     base.propulsors.battery_propeller.battery.mass_properties.mass = batmass
-        
+    
     # Set Battery Charge
     maxcharge = nexus.vehicle_configurations.base.propulsors.battery_propeller.battery.max_energy
     nexus.missions.mission.segments[0].battery_energy = maxcharge 
@@ -129,24 +132,27 @@ def post_process(nexus):
     base = nexus.vehicle_configurations.base
     res  = nexus.results.mission.segments
     
+    # Extract total aircraft weight
+    total_weight = base.mass_properties.max_takeoff
+    
     # Check total range:
     mission_range = res[-1].conditions.frames.inertial.position_vector[-1,0]    
+    mission_time = res[-1].conditions.frames.inertial.time[-1,0]
        
     # Final Energy
-    maxcharge    = base.propulsors.battery_propeller.battery.max_energy
-    extra_energy = res[-1].conditions.propulsion.battery_energy[-1,0] #(maxcharge - res[-1].conditions.propulsion.battery_energy[-1,0])
-    
+    maxcharge         = base.propulsors.battery_propeller.battery.max_energy
+    extra_energy      = res[-1].conditions.propulsion.battery_energy[-1,0] #(maxcharge - res[-1].conditions.propulsion.battery_energy[-1,0])
     battery_remaining = extra_energy/maxcharge
-    # Energy constraints, the battery doesn't go to zero anywhere, using a P norm
-    p                    = 8.    
-    energies             = res[-1].conditions.propulsion.battery_energy[:,0]/np.abs(maxcharge)
-    energies[energies>0] = 0.0 # Exclude the values greater than zero
-    energy_constraint    = np.sum((np.abs(energies)**p))**(1/p) 
-    
+
     # Pack up
     summary = nexus.summary
-    summary.base_mission_range    = -mission_range          # maximize range
-    summary.battery_remaining     = 100*(battery_remaining - 0.3) # leaves 30% reserve
+    #summary.mission_time       = mission_time
+    summary.mission_range       = mission_range   
+    summary.nothing            = 0.0
+    summary.battery_remaining  = battery_remaining
+    summary.payload            = base.mass_properties.max_payload
+    #summary.energy_usage       = (maxcharge-extra_energy)
+    summary.total_weight       = total_weight
     
     return nexus    
 

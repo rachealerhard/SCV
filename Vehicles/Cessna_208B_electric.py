@@ -2,7 +2,7 @@
 # 
 # Created:  Jan 2021, R. Erhard
 
-""" setup file for Cessna 208B Super Cargomaster Aircraft
+""" setup file for Cessna Caravan
 """
 
 # ----------------------------------------------------------------------
@@ -18,9 +18,11 @@ from SUAVE.Methods.Geometry.Two_Dimensional.Cross_Section.Airfoil.compute_airfoi
 from SUAVE.Methods.Power.Battery.Sizing import initialize_from_mass
 
 from SUAVE.Components.Energy.Networks.Battery_Propeller import Battery_Propeller
-from SUAVE.Methods.Propulsion.electric_motor_sizing import size_from_kv
+#from SUAVE.Methods.Propulsion.electric_motor_sizing import size_from_kv
+from SUAVE.Methods.Propulsion.electric_motor_sizing            import size_optimal_motor
 import numpy as np
 import pylab as plt
+import os
 
 
 
@@ -28,7 +30,7 @@ import pylab as plt
 #   Define the Vehicle
 # ----------------------------------------------------------------------
 
-def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
+def vehicle_setup():
     
     # ------------------------------------------------------------------
     #   Initialize the Vehicle
@@ -36,25 +38,28 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
 
     vehicle = SUAVE.Vehicle()
     vehicle.tag = 'Cessna_208B_electric'    
-
+    vehicle.systems.accessories = 'short-range'
+    vehicle.systems.control = 'partially powered'
 
     # ------------------------------------------------------------------
     #   Vehicle-level Properties
     # ------------------------------------------------------------------    
 
     # mass properties
-    vehicle.mass_properties.max_takeoff     = takeoff_mass # 3985. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.takeoff         = takeoff_mass # 3985. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.operating_empty = 2533. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.max_zero_fuel   = 2533. * Units.kilogram        # switch to FLOPS outputs
-    vehicle.mass_properties.cargo           = cargo_mass #1451. * Units.kilogram        # switch to FLOPS outputs
+    vehicle.mass_properties.max_takeoff     = 3985. * Units.kilogram  * 1.1
+    vehicle.mass_properties.takeoff         = 3985. * Units.kilogram  * 1.1
+    vehicle.mass_properties.battery_mass    = 1009 * Units.kg
+    vehicle.mass_properties.max_payload     = 1500. * Units.lb
+    
+    #vehicle.mass_properties.operating_empty = vehicle.mass_properties.max_takeoff - vehicle.mass_properties.max_payload 
 
+    
     # envelope properties
     vehicle.envelope.limit_load    = 3.8 # airplane designed to withstand 3.8 positive g's before deformation begins
     vehicle.envelope.ultimate_load = 5.7 # limit load with a safety factor of 1.5
     
     # basic parameters
-    vehicle.reference_area         = 279. * Units.feet**2       # set from constraint diagram analysis
+    vehicle.reference_area         = 279. * Units.feet**2       # will be set from constraint diagram analysis
     vehicle.passengers             = 9
 
     # ------------------------------------------------------------------        
@@ -160,21 +165,22 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
     # Component 2 the Propeller
     # Design the Propeller
     prop = SUAVE.Components.Energy.Converters.Propeller()
-    prop.number_blades       = 3.0
-    prop.freestream_velocity = 185.   * Units.knots # update to cruise velocity chosen for mission
-    prop.angular_velocity    = 1700.  * Units.rpm    # automatically optimized during the mission, so this is default
+    prop.number_of_blades       = 3.0
+    prop.freestream_velocity = 180.   * Units.mph
+    prop.angular_velocity    = 1700.  * Units.rpm   
     prop.design_altitude     = 12000. * Units.feet
     prop.design_thrust       = None #0.0
     prop.design_power        = .64 * 503 * Units.kilowatts    
     
     prop = prop_inputs(prop)
     
-    prop.airfoil_geometry = ["Polars\Clark_y.txt"]
+    airfoils_path = os.path.join(os.path.dirname(__file__), "Polars/")
+    prop.airfoil_geometry = [airfoils_path + "Clark_y.txt"]
     prop.airfoil_polars = [[
-            "Polars\Clark_y_polar_Re_100000.txt",
-            "Polars\Clark_y_polar_Re_200000.txt",
-            "Polars\Clark_y_polar_Re_500000.txt",
-            "Polars\Clark_y_polar_Re_1000000.txt",
+            airfoils_path + "Clark_y_polar_Re_100000.txt",
+            airfoils_path + "Clark_y_polar_Re_200000.txt",
+            airfoils_path + "Clark_y_polar_Re_500000.txt",
+            airfoils_path + "Clark_y_polar_Re_1000000.txt",
         ]]    
     polar_stations = np.zeros(20)
     prop.airfoil_polar_stations = list(polar_stations.astype(int))
@@ -193,8 +199,9 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
     
     # Component: Battery
     bat = SUAVE.Components.Energy.Storages.Batteries.Constant_Mass.Lithium_Ion()
-    bat = bat_inputs(bat,battery_mass)
-    bat.specific_energy      = e_bat * 0.8 # weighted by packing factor
+    #bat = bat_inputs(bat)
+    bat.mass_properties.mass = 1009 * Units.kg
+    bat.specific_energy      = (450 *Units.Wh/Units.kg) * 0.8 # weighted by packing factor
     bat.resistance           = 0.006
     bat.max_voltage          = 500.
     
@@ -202,55 +209,17 @@ def vehicle_setup(takeoff_mass, battery_mass, cargo_mass, e_bat):
     net.battery       = bat
     net.voltage       = bat.max_voltage
         
-        
-        
-        
-    #------------------------------------------------------------------
-    # Design Motors
-    #------------------------------------------------------------------
-    # Propeller  motor
-    # Component 4 the Motor
-    motor                              = SUAVE.Components.Energy.Converters.Motor()
-    etam                               = 0.95
-    v                                  = bat.max_voltage *3/4
-    omeg                               = prop.angular_velocity  
-    io                                 = 4.0 
-    start_kv                           = 1
-    end_kv                             = 25
-    # do optimization to find kv or just do a linspace then remove all negative values, take smallest one use 0.05 change
-    # essentially you are sizing the motor for a particular rpm which is sized for a design tip mach 
-    # this reduces the bookkeeping errors     
-    possible_kv_vals                   = np.linspace(start_kv,end_kv,(end_kv-start_kv)*20 +1 , endpoint = True) * Units.rpm
-    res_kv_vals                        = ((v-omeg/possible_kv_vals)*(1.-etam*v*possible_kv_vals/omeg))/io  
-    positive_res_vals                  = np.extract(res_kv_vals > 0 ,res_kv_vals) 
-    kv_idx                             = np.where(res_kv_vals == min(positive_res_vals))[0][0]   
-    kv                                 = possible_kv_vals[kv_idx]  
-    res                                = min(positive_res_vals) 
 
-    motor.mass_properties.mass         = 10. * Units.kg
-    motor.origin                       = prop.origin  
-    motor.propeller_radius             = prop.tip_radius   
-    motor.speed_constant               = 0.35 
-    motor.resistance                   = res
-    motor.no_load_current              = io 
-    motor.gear_ratio                   = 1. 
-    motor.gearbox_efficiency           = 1. # Gear box efficiency     
-    net.motor                          = motor         
-    
-    ## Component: Motor
-    #motor = SUAVE.Components.Energy.Converters.Motor()
-    #kv    = 2100* Units['rpm']/bat.max_voltage # RPM/volt converted to (rad/s)/volt  (Kv = omega_no_load / Vpeak)
-    #io    = 4.
-    #motor.speed_constant = kv
-    #motor.mass_properties.mass = 10. * Units.kilogram
-    #motor.no_load_current      = io
-    #motor.resistance           = net.voltage/io
-    #motor.gear_ratio           = 1. 
-    #motor.gearbox_efficiency   = 0.98 
-    ##motor.expected_current     = 15. 
-    #motor.propeller_radius     = prop.tip_radius
-    #motor.propeller_Cp         = prop.design_power_coefficient   
-    #net.motor                  = motor
+    # Propeller  motor
+    propeller_motor                      = SUAVE.Components.Energy.Converters.Motor()
+    propeller_motor.efficiency           = 0.95
+    propeller_motor.nominal_voltage      = bat.max_voltage 
+    propeller_motor.mass_properties.mass = 10.0  * Units.kg
+    propeller_motor.origin               = prop.origin  
+    propeller_motor.propeller_radius     = prop.tip_radius      
+    propeller_motor.no_load_current      = 2.0  
+    propeller_motor                      = size_optimal_motor(propeller_motor,prop)
+    net.motor                            = propeller_motor
     
 
     # Component 6 the Payload
@@ -377,8 +346,8 @@ def prop_inputs(prop):
     
     return prop    
 
-def bat_inputs(bat, battery_mass):
-    bat.mass_properties.mass = battery_mass #1009 * Units.kg  # optimize how much battery weight we bring to maximize range
+def bat_inputs(bat):
+    bat.mass_properties.mass = 1009 * Units.kg
     
     return bat
 

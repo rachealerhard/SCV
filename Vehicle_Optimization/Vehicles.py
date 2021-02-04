@@ -12,8 +12,8 @@ import numpy as np
 from SUAVE.Core import Units, Data
 
 import sys
-sys.path.append('../Vehicle_Scripts')
-from vehicle_setup_Cessna_208B_electric import vehicle_setup
+sys.path.append('../Vehicles')
+from Cessna_208B_electric import vehicle_setup
 
 # ----------------------------------------------------------------------
 #   Define the Vehicle
