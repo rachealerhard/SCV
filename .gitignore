@@ -139,3 +139,12 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# SUAVE
+.vsp3
+.geo
+.stl
+.vsptime
+.key
+.su2
+.dat
