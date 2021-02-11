@@ -147,6 +147,14 @@ def inducedDrag(dynamic_pressure, cfg):
     drag_coeff_induced =  (lift_coeff ** 2) / (np.pi * aspect_ratio * cfg.wing_efficiency)
     return drag_coeff_induced
 
+<<<<<<< HEAD
+=======
+    def __init__(self, cargo_mass):
+        super().__init__(cargo_mass)
+        # propulsion
+        self.energy_density = 200  # [Wh/kg]
+        self.battery_mass = self.fuel_mass  # [kg]
+>>>>>>> main
 
 def takeoffSpeed(cfg):
     """

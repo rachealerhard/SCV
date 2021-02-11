@@ -32,14 +32,14 @@ def main():
     # ----------------------------------------------------------------
     # Cruise: Constant altitude/speed, (Ps=0)
     # ---------------------------------------------------------------- 
-    alt = 7620 * Units.meter
-    Vcruise = 190 * Units.mph    
+    alt = 4500 * Units.meter
+    Vcruise = 180 * Units.mph    
     T_W_cruise     = compute_T_W_cruise(K1,K2,W_S,alt,Vcruise)
     
     # ----------------------------------------------------------------
     # Cruise: Max cruise speed (Ps=0)
     # ----------------------------------------------------------------    
-    alt = 7620 * Units.meter
+    alt = 4500 * Units.meter
     Vcruise = 214 * Units.mph    
     T_W_max_cruise = compute_T_W_max_cruise(K1,K2,W_S,alt,Vcruise)
     
@@ -57,11 +57,10 @@ def main():
     V_freestream = 150. * Units.mph
     T_W_climb = compute_T_W_climb(K1,K2,W_S,alt,V_freestream)
 
-
     # ----------------------------------------------------------------
     # Constant velocity Turn:
     # ---------------------------------------------------------------- 
-    alt = 6000. * Units.meter
+    alt = 4000. * Units.meter
     V_freestream = 190. * Units.mph
     T_W_turn = compute_T_W_turn(K1,K2,W_S,alt,V_freestream)
     
