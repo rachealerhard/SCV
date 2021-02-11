@@ -13,7 +13,7 @@ from basic_range_sim import RangeAnalysis
 def main(*args):
 
     cargo_mass = 300  # [kg]
-    aircraft = ElectricCessna(cargo_mass)
+    aircraft = Cessna208BElectric(cargo_mass)
     analysis = RangeAnalysis(aircraft, verbose=args[0])
 
     # battery mass
@@ -30,7 +30,7 @@ def main(*args):
     
 
 ### Aircraft ###
-class Cessna208:
+class Cessna208B:
 
     # mass
     turbo_prop_mass = 122.5  # [kg]  P & W PT6A-6
@@ -60,7 +60,7 @@ class Cessna208:
         self.cargo_mass = cargo_mass
 
 
-class ElectricCessna(Cessna208):
+class Cessna208BElectric(Cessna208B):
 
     def __init__(self, cargo_mass=0, battery_mass=None, energy_density=180):
         super().__init__(cargo_mass)
