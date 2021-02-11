@@ -80,7 +80,7 @@ class Cessna208BElectric(Cessna208B):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Run a basic electric aircraft range smulation")
     parser.add_argument("-v", "--verbose", action='store_true')
     args = parser.parse_args()
     main(args.verbose)

@@ -6,31 +6,41 @@
 # ----------------------------------------------------------------------        
 #   Imports
 # ----------------------------------------------------------------------    
-
 import SUAVE
-import numpy as np
 from SUAVE.Core import Units, Data
 
+import importlib
 import sys
 sys.path.append('../Vehicles')
-from Cessna_208B_electric import vehicle_setup
+# from Cessna_208B_electric import vehicle_setup
 
 # ----------------------------------------------------------------------
 #   Define the Vehicle
 # ----------------------------------------------------------------------
+def import_vehicle(vehicle_name):
+    """
+    Imports the setup function for the correct vehicle using
+    the vehicles name
+    """
+    vehicle_module = importlib.import_module(vehicle_name)
+    print(f"Vehicle setup function loaded for {vehicle_name}")
+    return vehicle_module.vehicle_setup
 
-def setup():
-    
-    base_vehicle = base_setup()
+
+def setup(vehicle_name):
+
+    vehicle_setup_function = import_vehicle(vehicle_name)
+    base_vehicle = vehicle_setup_function()
     configs = configs_setup(base_vehicle)
     
     return configs
     
-def base_setup():
-    
-    vehicle = vehicle_setup()
 
-    return vehicle
+# def base_setup():
+    
+#     vehicle = vehicle_setup()
+
+#     return vehicle
 
 # ----------------------------------------------------------------------
 #   Define the Configurations
