@@ -62,7 +62,7 @@ class RangeAnalysis:
         return flight_ranges
 
     @staticmethod
-    def visualize1D(self, flight_ranges, parameter, values):
+    def visualize1D(flight_ranges, parameter, values):
         """
         Make a standard plot of 1D parametric sim results
         """
@@ -75,7 +75,7 @@ class RangeAnalysis:
         plt.show()
 
     @staticmethod
-    def visualize2D(self, flight_ranges, parameterA, valuesA, parameterB, valuesB):
+    def visualize2D(flight_ranges, parameterA, valuesA, parameterB, valuesB):
         """
         Make some standard plots of 2D parametric sim results
         """
