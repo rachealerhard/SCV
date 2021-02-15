@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-import pdb
+
 
 # ==============
 # Constants
@@ -18,9 +18,17 @@ Wh_to_J = 3600
 kmh_to_ms = 1 / 3.6
 
 
+
+def main():
+    """
+
+    """
+    exampleAnalysis()
+
+
 def exampleAnalysis():
     """
-    An example analysis showing how the inputs required
+    An example analysis showing the inputs required
     and how to run a fixed point or a parametric analysis
 
     """
@@ -71,6 +79,9 @@ def exampleAnalysis():
 
 
 class RangeAnalysis:
+    """
+    A range analysis and visualization tool
+    """
 
     def __init__(self, aircraft):
         self.aircraft = aircraft
@@ -220,13 +231,6 @@ class RangeAnalysis:
 
 class ArgumentError(ValueError):
     """Raise when incorrect arguments passed to parameteric analysis"""
-
-
-def main():
-    """
-
-    """
-    exampleAnalysis()
 
 
 if __name__ == "__main__":
