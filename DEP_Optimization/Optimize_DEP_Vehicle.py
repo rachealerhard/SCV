@@ -1,6 +1,6 @@
 # Optimize.py
 # 
-# Created:  Jan 2021, R. Erhard
+# Created:  Feb 2021, R. Erhard
 # Modified: 
 
 # ----------------------------------------------------------------------        
@@ -32,10 +32,12 @@ def main():
     output  = scipy_setup.SciPy_Solve(problem)
     end_t = (time.time() - start_t)/60 
     print(f"\n\n\nElapsed time: {end_t :.2f} [min]")
-    print(f"\nMission range: {problem.summary.mission_range/1000 :.2f} [km]")
-    print(f"\nTotal aircraft weight: {problem.summary.total_weight :.2f} [kg]")
-    print(f"\nBattery mass required: {problem.optimization_problem.inputs[0][1] :.2f} [kg]")
-    print(f"\nPayload: {problem.summary.payload :.2f} [kg]")
+    print(f"Mission range: {problem.summary.mission_range/1000 :.2f} [km]")
+    print(f"Total aircraft weight: {problem.summary.total_weight :.2f} [kg]")
+    print(f"Payload: {problem.summary.payload :.2f} [kg]")
+    print(f"Wing aspect ratio: {problem.optimization_problem.inputs[0][1] :.2f} [kg]")
+    print(f"Wing sweep: {problem.optimization_problem.inputs[1][1] :.2f} [m^2]")
+    print(f"Taper ratio: {problem.optimization_problem.inputs[2][1] :.2f}")
     problem.translate(output)
 
     Plot_Mission.plot_mission(problem.results.mission)
@@ -58,7 +60,9 @@ def setup():
 
     # [ tag , initial, [lb,ub], scaling, units ]
     problem.inputs = np.array([
-        [ 'bat_mass'       ,   1500.  , ( 800. , 1600.), 1000.0 , Units.kg      ],        
+        [ 'wing_aspect_ratio'  ,     9.702 , (    5. ,   12.), 10.0 , Units.less       ],   
+        [ 'wing_sweep'         ,     0.    , (  -10.*Units.deg ,   25.*Units.deg), 1.0 , Units.rad  ], 
+        [ 'wing_taper_ratio'  ,     0.7 ,    (  0.5 ,   1.), 1.0 , Units.less       ],
         ]) 
 
     # -------------------------------------------------------------------
@@ -67,8 +71,7 @@ def setup():
 
     # [ tag, scaling, units ]
     problem.objective = np.array([
-        [ 'Nothing', 1.0, Units.kg],
-        #[ 'total_weight', 1.0, Units.kg], 
+        [ 'energy_usage', 1e8, Units.J], 
     ])
     
     # -------------------------------------------------------------------
@@ -78,7 +81,6 @@ def setup():
     # [ tag, sense, edge, scaling, units ]
     problem.constraints = np.array([
         [ 'battery_remaining', '>', 0.30, 1., Units.less],
-        [ 'battery_remaining', '<', 0.35, 1., Units.less],
     ])
     
     # -------------------------------------------------------------------
@@ -86,18 +88,23 @@ def setup():
     # -------------------------------------------------------------------
     
     # [ 'alias' , ['data.path1.name','data.path2.name'] ]
+    
     problem.aliases = [
-        #[ 'wing_area'         , 'vehicle_configurations.*.wings.main_wing.areas.reference'  ],
-        #[ 'wing_aspect_ratio' , 'vehicle_configurations.*.wings.main_wing.aspect_ratio'  ],
-        #[ 'wing_sweeps'         , 'vehicle_configurations.*.wings.main_wing.sweeps.quarter_chord'  ], 
+        #[ 'bat_mass'          , ['vehicle_configurations.*.mass_properties.battery_mass',
+                           #'vehicle_configurations.*.propulsors.battery_propeller.battery.mass_properties.mass'] ],
+        #[ 'wing_area'         , ['vehicle_configurations.*.wings.main_wing.areas.reference',
+                                 #'vehicle_configurations.*.reference_area']],
+        [ 'wing_aspect_ratio' , 'vehicle_configurations.*.wings.main_wing.aspect_ratio'  ],
+        [ 'wing_sweep'        , 'vehicle_configurations.*.wings.main_wing.sweeps.quarter_chord'  ], 
+        [ 'wing_taper_ratio'        , 'vehicle_configurations.*.wings.main_wing.taper'  ], 
         #[ 'cruise_alt'      , 'missions.mission.segments.cruise.altitude'  ],
-        [ 'bat_mass'    , 'vehicle_configurations.*.mass_properties.battery_mass'  ],
-        [ 'total_weight'    , 'summary.total_weight'  ],
-        #[ 'energy_usage' , 'summary.energy_usage'                    ],
+        #[ 'total_weight'      , 'summary.total_weight'  ],
+        [ 'energy_usage'      , 'summary.energy_usage'                    ],
         [ 'battery_remaining' , 'summary.battery_remaining'                    ],
-        [ 'Nothing'          ,  'summary.nothing'       ]
+        #[ 'Nothing'           , 'summary.nothing'       ],
         #[ 'mission_time'      , 'summary.mission_range'                         ],
-    ]      
+        #[ 'objective'         , 'summary.objective' ], 
+    ]         
     
     # -------------------------------------------------------------------
     #  Vehicles
@@ -121,5 +128,8 @@ def setup():
     
     return nexus
 
+
 if __name__ == '__main__':
     main()
+    
+    

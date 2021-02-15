@@ -53,17 +53,16 @@ def mission(analyses,vehicle):
     
 
     ones_row     = base_segment.state.ones_row
-    base_segment.state.numerics.number_control_points        = 4
-    
-    base_segment.process.iterate.unknowns.network            = vehicle.base.propulsors.battery_propeller.unpack_unknowns
     base_segment.process.iterate.initials.initialize_battery = SUAVE.Methods.Missions.Segments.Common.Energy.initialize_battery
     base_segment.process.iterate.conditions.planet_position  = SUAVE.Methods.skip
-    base_segment.process.iterate.residuals.network           = vehicle.base.propulsors.battery_propeller.residuals
+    base_segment.state.numerics.number_control_points        = 4
+    base_segment.process.iterate.unknowns.network            = vehicle.propulsors.battery_propeller.unpack_unknowns
+    base_segment.process.iterate.residuals.network           = vehicle.propulsors.battery_propeller.residuals
     
     base_segment.state.unknowns.propeller_power_coefficient  = 0.16 * ones_row(1) 
-    base_segment.state.unknowns.battery_voltage_under_load   = vehicle.base.propulsors.battery_propeller.battery.max_voltage * ones_row(1)  
+    base_segment.state.unknowns.battery_voltage_under_load   = vehicle.propulsors.battery_propeller.battery.max_voltage * ones_row(1)  
     base_segment.state.residuals.network                     = 0. * ones_row(2)             
-    base_segment.battery_energy           = vehicle.base.propulsors.battery_propeller.battery.max_energy
+    #base_segment.battery_energy           = vehicle.base.propulsors.battery_propeller.battery.max_energy
 
 
     # ------------------------------------------------------------------
@@ -73,13 +72,14 @@ def mission(analyses,vehicle):
     segment = Segments.Cruise.Constant_Speed_Constant_Altitude(base_segment)
     segment.tag = "cruise"
 
-    segment.analyses.extend( analyses.cruise )
+    segment.analyses.extend( analyses )
 
-    segment.altitude  = 4000. * Units.meter 
-    segment.air_speed = 180.   * Units.mph
-    segment.distance  = 500.   * Units.kilometer
+    segment.altitude  = 3500. * Units.meter 
+    segment.air_speed = 180.  * Units.mph
+    segment.distance  = 100 * Units.kilometer #412.37  * Units.kilometer
     segment.state.unknowns.throttle   = 0.9 *  ones_row(1)  
-
+    segment.battery_energy           = vehicle.propulsors.battery_propeller.battery.max_energy
+    
     # add to misison
     mission.append_segment(segment)    
     

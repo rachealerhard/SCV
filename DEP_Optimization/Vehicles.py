@@ -13,7 +13,7 @@ from SUAVE.Core import Units, Data
 
 import sys
 sys.path.append('../Vehicles')
-from Cessna_208B_electric import vehicle_setup
+from DEP_Aircraft import vehicle_setup
 
 # ----------------------------------------------------------------------
 #   Define the Vehicle
