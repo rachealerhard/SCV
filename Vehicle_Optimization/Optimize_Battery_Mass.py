@@ -9,6 +9,7 @@
 
 from SUAVE.Core import Units, Data
 import numpy as np
+import argparse
 import Vehicles
 import Analyses
 import Missions
@@ -21,12 +22,11 @@ import time
 # ----------------------------------------------------------------------        
 #   Run the whole thing
 # ----------------------------------------------------------------------  
-def main():
-    '''
-   
+def main(args):
     '''
     
-    problem = setup()
+    '''
+    problem = setup(args.Vehicle)
     
     start_t = time.time()
     output  = scipy_setup.SciPy_Solve(problem)
@@ -46,7 +46,7 @@ def main():
 #   Inputs, Objective, & Constraints
 # ----------------------------------------------------------------------  
 
-def setup():
+def setup(vehicle_name):
 
     nexus = Nexus()
     problem = Data()
@@ -96,7 +96,7 @@ def setup():
     # -------------------------------------------------------------------
     #  Vehicles
     # -------------------------------------------------------------------
-    nexus.vehicle_configurations = Vehicles.setup()
+    nexus.vehicle_configurations = Vehicles.setup(vehicle_name)
     
     # -------------------------------------------------------------------
     #  Analyses
@@ -115,5 +115,14 @@ def setup():
     
     return nexus
 
+
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Run the SUAVE optimization')
+    parser.add_argument('Vehicle',
+                        metavar='vehicle',
+                        type=str,
+                        help='the name of the vehicle file',
+                        nargs='?',
+                        default='Cessna_208B_electric')
+    args = parser.parse_args()
+    main(args)
