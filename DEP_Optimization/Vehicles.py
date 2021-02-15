@@ -6,35 +6,36 @@
 # ----------------------------------------------------------------------        
 #   Imports
 # ----------------------------------------------------------------------    
+
 import SUAVE
+import numpy as np
 from SUAVE.Core import Units, Data
 
-import importlib
 import sys
 sys.path.append('../Vehicles')
-# from Cessna_208B_electric import vehicle_setup
+from DEP_Aircraft import vehicle_setup
 
 # ----------------------------------------------------------------------
 #   Define the Vehicle
 # ----------------------------------------------------------------------
-def import_vehicle(vehicle_name):
-    """
-    Imports the setup function for the correct vehicle using
-    the vehicles name
-    """
-    vehicle_module = importlib.import_module(vehicle_name)
-    print(f"Vehicle setup function loaded for {vehicle_name}")
-    return vehicle_module.vehicle_setup
 
-
-def setup(vehicle_name):
-
-    vehicle_setup_function = import_vehicle(vehicle_name)
-    base_vehicle = vehicle_setup_function()
+def setup():
+    
+    base_vehicle = base_setup()
     configs = configs_setup(base_vehicle)
     
     return configs
     
+def base_setup():
+    
+    vehicle = vehicle_setup()
+    
+    # Set wing area from constraint diagram
+    Sref = 30. # m^2
+    vehicle.reference_area = Sref
+    vehicle.wings.main_wing.areas.reference = Sref
+
+    return vehicle
 
 # ----------------------------------------------------------------------
 #   Define the Configurations

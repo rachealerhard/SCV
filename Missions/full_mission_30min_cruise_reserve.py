@@ -96,12 +96,28 @@ def mission(analyses, vehicle):
 
     segment.altitude  = 3500. * Units.meter 
     segment.air_speed = 180.  * Units.mph
-    segment.distance  = 442.37   * Units.kilometer 
+    segment.distance  = 252  * Units.kilometer 
     segment.state.unknowns.throttle = 0.8 *  ones_row(1)
     
     # add to misison
     mission.append_segment(segment)    
     
+    # ------------------------------------------------------------------
+    #   Second Cruise Segment: 30 minutes of reserve
+    # ------------------------------------------------------------------
+
+    segment = Segments.Cruise.Constant_Speed_Constant_Altitude(base_segment)
+    segment.tag = "cruise_reserve"
+
+    segment.analyses.extend( analyses.cruise )
+
+    segment.altitude  = 3500. * Units.meter 
+    segment.air_speed = 180.  * Units.mph
+    segment.distance  = segment.air_speed * 30*Units.minutes
+    segment.state.unknowns.throttle = 0.8 *  ones_row(1)
+    
+    # add to misison
+    mission.append_segment(segment)        
     
     # ------------------------------------------------------------------
     #   Descent Segment: constant Speed, constant rate segment 
@@ -110,13 +126,14 @@ def mission(analyses, vehicle):
     segment.tag = "descent" 
     segment.analyses.extend( analyses.landing ) 
     segment.altitude_start            = 3500. * Units.meter
-    segment.altitude_end              = 1500  * Units.meter
-    segment.air_speed                 = 150. * Units['mph']  
+    segment.altitude_end              = 1500.0  * Units.meter
+    segment.air_speed                 = 160. * Units['mph']  
     segment.climb_rate                = - 500.  * Units['ft/min']  
     segment.state.unknowns.throttle   = 0.9 * ones_row(1)  
     
     # add to misison
     mission.append_segment(segment)     
+    
 
     # ------------------------------------------------------------------
     #   Mission definition complete    
