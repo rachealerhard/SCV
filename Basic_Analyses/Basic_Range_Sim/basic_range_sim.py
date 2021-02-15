@@ -43,7 +43,7 @@ class RangeAnalysis:
         """
         Perform a parameteric analysis of two variables taking on specified values
         """
-        flight_ranges = np.zeros((len(valuesA), len(valuesB)))
+        flight_ranges = np.zeros((len(valuesB), len(valuesA)))
         for i, valA in enumerate(valuesA):
             try:
                 setattr(self.aircraft, parameterA, valA)
