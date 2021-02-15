@@ -1,5 +1,6 @@
 """
-Lowest order analysis, computes cruise range based on basic vehicle properties
+Lowest order analysis, computes cruise range based on basic aircraft parameters
+The purpose is to strip the analysis back to be non-vehicle specific
 
     Nick Goodson
     Feb 2021
@@ -8,6 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+import copy
+import pdb
 
 
 # ==============
@@ -16,14 +19,6 @@ from matplotlib import cm
 gravity = 9.81  # [m/s^2]
 Wh_to_J = 3600
 kmh_to_ms = 1 / 3.6
-
-
-
-def main():
-    """
-
-    """
-    exampleAnalysis()
 
 
 def exampleAnalysis():
@@ -36,16 +31,16 @@ def exampleAnalysis():
     # =====================
     # Define Aircraft
     # =====================
-    cfg = {
-        "gross_mass":              3000,           # [kg]
-        "battery_mass_fraction":   0.4,            # battery mass / gross mass
+    aircraft = { 
+        "dry_mass":                3000,           # [kg]
+        "battery_mass":            1000,           # [kg]
         "energy_density":          220 * Wh_to_J,  # [J/kg]
         "packing_factor":          0.8,
         "capcity_fade":            0.15,           # fraction of total capacity
         "inaccessible_fraction":   0.08,           # fraction of total capacity
         "reserve_fraction":        0.2,            # fraction of useable capacity
         "cruise_fraction":         0.6,            # fraction of useable capacity
-        "drivetrain_efficiency":    0.9,
+        "drivetrain_efficiency":   0.9,
         "LD_ratio":                11
     }
 
@@ -53,7 +48,7 @@ def exampleAnalysis():
     # ======================
     # Fixed Point Analysis
     # ======================
-    analysis = RangeAnalysis(cfg)
+    analysis = RangeAnalysis(aircraft)
 
     performance_new = analysis.electricCruiseRange()
     performance_eol = analysis.electricCruiseRange(end_of_life=True)
@@ -67,15 +62,21 @@ def exampleAnalysis():
 
     # 1D parametric study
     LD_s = np.arange(8, 40, 1)
-    analysis.parametricStudy(["LD_ratio"], [LD_s])
+    ranges = analysis.parametricStudy(['LD_ratio'], [LD_s])
 
     # 2D parametric study
     E_densities = np.arange(220, 800, 10) * Wh_to_J  # [J/kg]
-    display_units = [1, 1.0 / Wh_to_J]
-    analysis.parametricStudy(["LD_ratio", "energy_density"],
-                             [LD_s, E_densities],
-                              display_units=display_units,
-                              end_of_life=True)
+    params = ['LD_ratio', 'energy_density']
+    vals = [LD_s, E_densities]
+    units = [1, 1.0 / Wh_to_J]
+    ranges = analysis.parametricStudy(params, vals, display_units=units, end_of_life=True)
+
+    # Another 2D study
+    battery_masses = np.arange(500, 2000, 20)
+    dry_masses = np.arange(1600, 6000, 200)
+    params = ['battery_mass', 'dry_mass']
+    vals = [battery_masses, dry_masses]
+    analysis.parametricStudy(params, vals, end_of_life=False)
 
 
 class RangeAnalysis:
@@ -88,28 +89,38 @@ class RangeAnalysis:
 
     def electricCruiseRange(self, end_of_life=False):
         """
+        An alias to allow the user to compute the range without
+        passing in the aircraft (which the RangeAnalysis object already owns)
+        """
+        return self._electricCruiseRange(self.aircraft, end_of_life)
+
+    def _electricCruiseRange(self, aircraft=None, end_of_life=False):
+        """
         Computes aircarft cruise range using the 'electric range formula'
         
         @param end_of_life (bool): when true, battery capacity fade is included
-        @return outputs (dict): battery_mass
+        @return outputs (dict): battery_mass_fraction
                                 total_energy
                                 useable_energy
                                 reserve_energy
                                 cruise_energy
                                 cruise_range
-
         """
-        cfg = self.aircraft
+        if aircraft:
+            cfg = aircraft
+        else:
+            cfg = self.aircraft
         outputs = {}
-        outputs['battery_mass'] = cfg['battery_mass_fraction'] * cfg['gross_mass']
-        outputs['total_energy'] = outputs['battery_mass'] * cfg['energy_density'] * cfg['packing_factor']
+        outputs['total_mass'] = cfg['battery_mass'] + cfg['dry_mass']
+        outputs['battery_mass_fraction'] = cfg['battery_mass'] / outputs['total_mass']
+        outputs['total_energy'] = cfg['battery_mass'] * cfg['energy_density'] * cfg['packing_factor']
         if end_of_life:
             outputs['total_energy'] *= (1 - cfg['capcity_fade'])
         outputs['useable_energy'] = outputs['total_energy'] * (1 - cfg['inaccessible_fraction'])
         outputs['reserve_energy'] = outputs['useable_energy'] * cfg['reserve_fraction']
         outputs['cruise_energy'] = outputs['useable_energy'] * cfg['cruise_fraction']
         outputs['cruise_range'] = cfg['drivetrain_efficiency'] * cfg['LD_ratio'] * outputs['cruise_energy'] /\
-                                                                             (gravity * cfg['gross_mass'])
+                                                                             (gravity * outputs['total_mass'])
 
         return outputs
 
@@ -147,14 +158,15 @@ class RangeAnalysis:
         Perform a parametric analysis of a single variable taking on specified values
 
         """
+        aircraft = copy.deepcopy(self.aircraft)
         flight_ranges = np.zeros(len(values))
         for i, val in enumerate(values):
             try:
-                self.aircraft[parameter] = val
+                aircraft[parameter] = val
             except KeyError:
                 print(f"Error: {parameter} is not a key of {self.aircraft.__name__}")
                 return
-            outputs = self.electricCruiseRange(end_of_life=end_of_life)
+            outputs = self._electricCruiseRange(aircraft, end_of_life=end_of_life)
             flight_ranges[i] = outputs['cruise_range']
         self._visualize1D(flight_ranges, parameter, values, display_units)
 
@@ -165,21 +177,22 @@ class RangeAnalysis:
         Perform a parameteric analysis of two variables taking on specified values
 
         """
+        aircraft = copy.deepcopy(self.aircraft)
         flight_ranges = np.zeros((len(values[1]), len(values[0])))
         for i, valA in enumerate(values[0]):
             try:
-                self.aircraft[parameters[0]] = valA
+                aircraft[parameters[0]] = valA
             except KeyError:
                 print(f"Error: {parameter[0]} is not a key of {self.aircraft.__name__}")
                 return
 
             for j, valB in enumerate(values[1]):
                 try:
-                    self.aircraft[parameters[1]] = valB
+                    aircraft[parameters[1]] = valB
                 except KeyError:
                     print(f"Error: {parameters[1]} is not a key of {self.aircraft.__name__}")
                     return
-                outputs = self.electricCruiseRange(end_of_life=end_of_life)
+                outputs = self._electricCruiseRange(aircraft, end_of_life=end_of_life)
                 flight_ranges[j, i] = outputs['cruise_range']
         self._visualize2D(flight_ranges, parameters, values, display_units)
 
@@ -231,6 +244,13 @@ class RangeAnalysis:
 
 class ArgumentError(ValueError):
     """Raise when incorrect arguments passed to parameteric analysis"""
+
+
+def main():
+    """
+
+    """
+    exampleAnalysis()
 
 
 if __name__ == "__main__":
