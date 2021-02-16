@@ -1,5 +1,6 @@
 """
 First order range analysis for battery-electric transport aircraft
+    - The parameters used in this analysis are specific to a particular aircraft model
 
     Nick Goodson
     Jan 2021
@@ -36,9 +37,13 @@ def electricCessna208Analysis():
     # Define Aircraft
     # =====================
     cessna_cfg = { 
+
+            # mass
             "dry_mass":                2145,           # [kg]
             "battery_mass":            1000,           # [kg]
-            "energy_density":          220 * Wh_to_J,     # [J/kg]
+
+            # energy
+            "energy_density":          450 * Wh_to_J,     # [J/kg]
             "packing_factor":          0.8,
             "inaccessible_fraction":   0.08,           # fraction of total capacity
             "reserve_fraction":        0.2,            # fraction of useable capacity
@@ -57,7 +62,7 @@ def electricCessna208Analysis():
 
             # Propulsion
             "engine_max_power":        503e3,  # [W]
-            "prop_efficiency":         0.85,
+            "drivetrain_efficiency":   0.85,
             "prop_diameter":           2.69  # [m] guesstimate
     }
 
@@ -101,6 +106,8 @@ def flightRange(cfg, verbose=False):
     """
     Compute the flight range with simple approximations for takeoff
     climb and cruise
+
+    @param aircraft, object containing the required aircraft parameters
     """
     total_weight = cfg.total_mass * gravity  # [N]
     energy_stored = cfg.total_energy * (1 - cfg.inaccessible_fraction) * (1 - cfg.reserve_fraction)  # [J]
@@ -171,7 +178,7 @@ def takeoffEnergy(takeoff_speed, cfg):
     Thrust approximation assumes very low free-stream velocity
     """
     density = airDensity(1)
-    thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.prop_efficiency * cfg.prop_diameter) ** 2) ** (1 / 3)
+    thrust = (0.5 * density * np.pi * (cfg.engine_max_power * cfg.drivetrain_efficiency * cfg.prop_diameter) ** 2) ** (1 / 3)
     takeoff_time = takeoff_speed * cfg.total_mass / thrust
     takeoff_energy = takeoff_time * cfg.engine_max_power
     return takeoff_energy 

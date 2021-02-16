@@ -1,6 +1,6 @@
 """
 Zeroeth order range analysis for battery electric aircraft
-    - Uses electric range equation
+    - Uses electric range equation and generic parameters
 
     Nick Goodson
     Feb 2021
@@ -39,7 +39,7 @@ def zeroOrderRangeAnalysis():
             "inaccessible_fraction":   0.08,           # fraction of total capacity
             "reserve_fraction":        0.2,            # fraction of useable capacity
             "cruise_fraction":         0.6,            # fraction of useable capacity
-            "drivetrain_efficiency":   0.9,
+            "drivetrain_efficiency":   0.85,           # Includes prop
             "LD_ratio":                11
     }
 
