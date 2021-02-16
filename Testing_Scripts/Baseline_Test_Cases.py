@@ -13,28 +13,105 @@ from SUAVE.Core import Units, Data
 from SUAVE.Methods.Performance.electric_payload_range import electric_payload_range
 from SUAVE.Plots.Geometry_Plots.plot_vehicle import plot_vehicle  
 
+
+import time
 import numpy as np
 import matplotlib.pyplot as plt
-
+import Plot_Mission
 import sys
 sys.path.append('../Vehicles')
-#from Cessna_208B_electric import vehicle_setup
+from Cessna_208B_electric import vehicle_setup
 
-from DEP_Aircraft import vehicle_setup
 sys.path.append('../Missions')
 from full_mission_30min_cruise_reserve_variable_cruise import mission as mission_setup
 
-from cruise_mission_fixed_mission_profile import mission as mission_setup
+# ----------------------------------------------------------------------        
+#   Run the whole thing
+# ----------------------------------------------------------------------  
+def main():
+    '''
+    Base case:   2300lb payload, 530km range + 30min cruise reserve
+    Output:      battery mass required and resulting energy usage
+   
+    '''
+    cases = np.array([4.1, 4.2, 4.3, 4.4])
+    for case in cases:
+        
+        if case == 1:
+            cargo_mass = 2300 * Units.lb
+            battery_mass = 2361 * Units.kg
+            base_vehicle = 'extra_bat'
+            
+        elif case ==2:
+            cargo_mass = 1300 * Units.lb
+            battery_mass = 2361 * Units.kg + 1000 * Units.lb
+            base_vehicle = 'extra_bat'
+            
+        elif case ==3:
+            battery_mass = 1590 * Units.kg
+            combined_mass = 3404.262451
+            cargo_mass = combined_mass - battery_mass
+            base_vehicle = 'extra_bat'
+        elif case ==0:
+            battery_mass = 3404.262451
+            combined_mass = 3404.262451
+            cargo_mass = combined_mass - battery_mass
+            base_vehicle = 'extra_bat'            
+            
+        elif case ==4.1:
+            cargo_mass = 2300 * Units.lb
+            battery_mass = 1009 * Units.kg
+            base_vehicle = 'converted'
+            
+        elif case ==4.2:
+            cargo_mass = 2000 * Units.lb
+            battery_mass = 1009 * Units.kg
+            base_vehicle = 'converted'
+            
+        elif case ==4.3:
+            cargo_mass = 1000 * Units.lb
+            battery_mass = 1009 * Units.kg   
+            base_vehicle = 'converted'
+            
+        elif case == 4.4:
+            cargo_mass = 0. * Units.lb
+            battery_mass = 1009 * Units.kg   
+            base_vehicle = 'converted'
+            
+        print(f"\n---------------------------------------\n"
+              f"Case {case } \n"
+              f"---------------------------------------\n")
+        start_t = time.time()    
+        results = payload_range_analysis(cargo_mass, battery_mass, base_vehicle)
+        elapsed = (time.time() - start_t)/60 
+        print(f"\nElapsed time: {elapsed :.2f} [min] ")
+        
+        Plot_Mission.plot_mission(results)
+    
+    return
+
 
 #-------------------------------------------------------------------------------
 # Test Function
 #-------------------------------------------------------------------------------
 
-def main():
-    cargo_mass = 1000 * Units.lb
-    battery_mass = 1009 * Units.kg  
+def payload_range_analysis(cargo_mass, battery_mass, base_vehicle):
+    ## Use base vehicle for vehicle setup including computation of weights
+    #if base_vehicle == 'converted':
+        #battery_m     = 1009 * Units.kg
+        #payload_max   = 2300 * Units.lb
+    #else:
+        #battery_m     = 2311 * Units.kg
+        #payload_max   = 2300 * Units.lb        
     
     vehicle  = vehicle_setup(cargo_mass,battery_mass)
+    #print(f"\nEmpty weight: {vehicle.mass_properties.operating_empty :.2f} [kg] ")
+    
+    ## Adjust weights:
+    #vehicle.mass_properties.battery_mass = battery_mass
+    #vehicle.mass_properties.max_payload = cargo_mass
+    
+    # Analysis
     analyses = base_analysis(vehicle)
     mission  = mission_setup(analyses,vehicle)
     
@@ -43,48 +120,8 @@ def main():
     
     results = mission.evaluate()
     analyze_results(vehicle,results)
-    
-    plot_vehicle(vehicle, save_figure = False, plot_control_points = False)
-    plt.show()    
-        
-    
-    stop_flag = 1
-    
-    #===============
-    
-    #payload_range = electric_payload_range(vehicle, mission, 'cruise', display_plot=False)
-    ## Vehicle analyses
-    #configs_analyses  = analyses_setup(configs)
-    #missions          = full_mission_setup(vehicle, configs_analyses) 
-    
-    #analyses = SUAVE.Analyses.Analysis.Container()
-    #analyses.missions = missions
-    
-    #configs.finalize()
-    #analyses.finalize()
-    
-    #mission = analyses.missions.mission
-    #results = mission.evaluate()
-    
-    #plot_vehicle(configs.base, save_figure = False, plot_control_points = False)
-    #plt.show()    
-    
-    #payload_range = electric_payload_range(vehicle, missions.mission, 'cruise', display_plot=False)
-    
-    ## Plot the payload-range diagram:
-    #R   = payload_range.range
-    #PLD = payload_range.payload
-    #TOW = payload_range.takeoff_weight
 
-    #plt.plot(R/1000, PLD, 'r', label='Battery Mass: ' + str(battery_mass) +'kg')
-    #plt.xlabel('Range (km)')
-    #plt.ylabel('Payload (kg)')
-    #plt.title('Payload Range Diagram\n(Fixed Battery Weight)')
-    #plt.grid(True)
-    #plt.legend()
-    #plt.show()    
-
-    return
+    return results
 
 
 def analyze_results(vehicle,results):
@@ -174,8 +211,8 @@ def base_analysis(vehicle):
     #  Aerodynamics Analysis
     # ------------------------------------------------------------------ 
     aerodynamics = SUAVE.Analyses.Aerodynamics.Fidelity_Zero()
-    aerodynamics.settings.use_surrogate              = False
-    aerodynamics.settings.propeller_wake_model       = True     
+    #aerodynamics.settings.use_surrogate              = False
+    #aerodynamics.settings.propeller_wake_model       = True     
     aerodynamics.geometry = vehicle
     analyses.append(aerodynamics)
     
@@ -201,6 +238,7 @@ def base_analysis(vehicle):
     analyses.append(atmosphere)   
 
     return analyses
+
 
 if __name__ == '__main__':
     main()

@@ -31,6 +31,9 @@ def setup():
     
     # compute the vehicle weights, size and charge the battery
     procedure.weights_battery = weights_battery
+    
+    ## spin propellers before aerodynamic analysis to capture DEP interaction
+    #procedure.propeller_spin  = spin_props    
 
     # finalize the data dependencies
     procedure.finalize        = finalize
@@ -158,7 +161,16 @@ def finalize(nexus):
     
     nexus.analyses.finalize()   
     
-    return nexus         
+    return nexus     
+
+def spin_props(nexus):
+    propeller = nexus.vehicle_configurations.base.propulsors.battery_propeller
+    conditions = nexus.results.mission.segments.base.state.conditions
+    F, Q, P, Cp, outputs , etap = propeller.spin(conditions)
+    propeller.outputs = outputs
+    nexus.vehicle_configurations.base.propulsors.battery_propeller = propeller
+    return nexus
+    
 
 # ----------------------------------------------------------------------
 #   Post Process results to give back to the optimizer
@@ -190,6 +202,10 @@ def post_process(nexus):
     total_drag     = res.cruise.state.conditions.aerodynamics.drag_breakdown.total[0][0]
     trim_corrected_drag = res.cruise.state.conditions.aerodynamics.drag_breakdown.trim_corrected_drag[0][0]
     
+    # Propeller swept area
+    base.propulsors.battery_propeller.propeller
+    
+    
     # Pack up
     summary = nexus.summary
     #summary.mission_time       = mission_time
@@ -211,11 +227,11 @@ def post_process(nexus):
     print(f"Energy usage: {summary.energy_usage/Units.kWh :.6f} [kWh]")
     print(f"Maxcharge: {maxcharge/Units.kWh :.6f} [kWh] \n")
     
-    #print(f"Cruise angle of attack: {cruise_aoa :.6f} [deg]")
-    #print(f"CD cruise: {total_drag :.6f} [-]")
-    #print(f"CD induced: {induced_drag :.6f} [-]")
-    #print(f"CD parasitic: {parasitic_drag :.6f} [-]")    
-    #print(f"CD trim: {trim_corrected_drag :.6f} [-]\n")      
+    print(f"Cruise angle of attack: {cruise_aoa :.6f} [deg]")
+    print(f"CD cruise: {total_drag :.6f} [-]")
+    print(f"CD induced: {induced_drag :.6f} [-]")
+    print(f"CD parasitic: {parasitic_drag :.6f} [-]")    
+    print(f"CD trim: {trim_corrected_drag :.6f} [-]\n")      
     
     return nexus    
 

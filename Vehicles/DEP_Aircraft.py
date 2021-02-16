@@ -146,7 +146,7 @@ def vehicle_setup(cargo_mass, battery_mass):
     
     # build network    
     net = Battery_Propeller()
-    net.number_of_engines = 1. # run various discrete cases
+    net.number_of_engines = 12. # run various discrete cases
     net.nacelle_diameter  = 42 * Units.inches
     net.engine_length     = 0.01 * Units.inches
     
@@ -165,9 +165,9 @@ def vehicle_setup(cargo_mass, battery_mass):
     prop.angular_velocity    = 1700.  * Units.rpm   
     prop.design_altitude     = 12000. * Units.feet
     prop.design_thrust       = None #0.0
-    prop.design_power        = .64 * 503 * Units.kilowatts    
+    prop.design_power        = .64 * 503 * Units.kilowatts   / net.number_of_engines 
     
-    prop = prop_inputs(prop)
+    prop = prop_geom(prop)
     
     airfoils_path = os.path.join(os.path.dirname(__file__), "Polars/")
     prop.airfoil_geometry = [airfoils_path + "Clark_y.txt"]
@@ -189,12 +189,13 @@ def vehicle_setup(cargo_mass, battery_mass):
     prop.airfoil_cl_surrogates = airfoil_cl_surs
     prop.airfoil_cd_surrogates = airfoil_cd_surs
     
+    prop = prop_origins(prop,net)
+    
     net.propeller        = prop
     
     
     # Component: Battery
     bat = SUAVE.Components.Energy.Storages.Batteries.Constant_Mass.Lithium_Ion()
-    #bat = bat_inputs(bat)
     bat.mass_properties.mass = vehicle.mass_properties.battery_mass
     bat.specific_energy      = (450 *Units.Wh/Units.kg) * 0.8 # weighted by packing factor
     bat.resistance           = 0.006
@@ -235,11 +236,7 @@ def vehicle_setup(cargo_mass, battery_mass):
     vehicle = calculate_takeoff_weight(vehicle)
     # ------------------------------------------------------------------
     #   Vehicle Definition Complete
-    # ------------------------------------------------------------------
-    
-    ## Plot the vehicle:
-    #plot_vehicle(vehicle, save_figure = False, plot_control_points = False)
-    #plt.show()        
+    # ------------------------------------------------------------------   
 
     return vehicle
 
@@ -384,7 +381,7 @@ def fuselage_inputs(fuselage):
     segment.percent_x_location                  = 0.04166667
     segment.percent_z_location                  = 0.00
     segment.height                              = (0.16198347/0.52644628) * fuselage.heights.maximum
-    segment.width                               = fuselage.width * 0.35
+    segment.width                               = fuselage.width * 0.45
     fuselage.Segments.append(segment)    
 
     # Segment                                   
@@ -393,7 +390,7 @@ def fuselage_inputs(fuselage):
     segment.percent_x_location                  = 0.19208333
     segment.percent_z_location                  = -0.81735537e-02
     segment.height                              = (0.35231405/0.52644628) * fuselage.heights.maximum
-    segment.width                               = fuselage.width * 0.5
+    segment.width                               = fuselage.width * 0.75
     fuselage.Segments.append(segment)         
 
     # Segment                                   
@@ -461,19 +458,31 @@ def fuselage_inputs(fuselage):
 
     return fuselage
 
-def prop_inputs(prop):
-    prop.tip_radius          = 106./2. * Units.inches 
-    prop.hub_radius          = 11.1    * Units.inches 
-    prop.design_Cl           = 0.8 
-    prop.origin              = [[0.,0.0,0.0]]      
-    prop.rotation            = [-1]
-    
-    return prop    
+def prop_geom(prop):
+    prop.tip_radius          = 0.3886 * Units.meter 
+    prop.hub_radius          = 0.2* prop.tip_radius 
+    prop.design_Cl           = 0.8
+    return prop
 
-def bat_inputs(bat):
-    bat.mass_properties.mass = 1009 * Units.kg
+def prop_origins(prop,net):
+    n = int(net.number_of_engines)
+    prop.origin = np.zeros([n,3])
+    prop.rotation = np.zeros(n)
     
-    return bat
+    for i in range(n):
+        prop.origin[i,0]  = 126.6* Units.inches
+        prop.origin[i,2]  = 0.832 + 13 * Units.inches
+        if i < n/2: # Left wing from behind
+            prop.origin[i,1]  = 1.5 + 2.85*i*prop.tip_radius
+            prop.rotation[i]  = -1
+        else: # Right wing from behind
+            prop.origin[i,1]  = -1.5 - 2.85*(i-n/2)*prop.tip_radius
+            prop.rotation[i]  = 1
+    
+    prop.rotation  = list(prop.rotation.astype(int))
+    prop.origin  = prop.origin.tolist()    
+    
+    return prop 
 
 def calculate_takeoff_weight(vehicle):
     # ------------------------------------------------------------------

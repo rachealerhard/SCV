@@ -53,6 +53,7 @@ def base(vehicle):
     # ------------------------------------------------------------------ 
     aerodynamics = SUAVE.Analyses.Aerodynamics.Fidelity_Zero()
     aerodynamics.geometry = vehicle
+    #aerodynamics.settings.propeller_wake_model = True
     #aerodynamics.settings.number_spanwise_vortices  = 10 
     #aerodynamics.settings.number_chordwise_vortices = 2    
     analyses.append(aerodynamics)
