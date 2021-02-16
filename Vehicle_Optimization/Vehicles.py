@@ -35,15 +35,6 @@ def setup(vehicle_name):
     
     return configs
     
-<<<<<<< HEAD
-
-# def base_setup():
-    
-#     vehicle = vehicle_setup()
-
-#     return vehicle
-=======
->>>>>>> main
 
 # ----------------------------------------------------------------------
 #   Define the Configurations
