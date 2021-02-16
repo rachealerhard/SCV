@@ -104,7 +104,7 @@ class ParametricAnalysis:
 
         """
         display_output = outputs * display_units[-1]
-        values *= display_units[0]
+        values = copy.deepcopy(values) * display_units[0]
         fig, ax = plt.subplots(figsize=(8,10))
         ax.plot(values, display_output, '-k')
         ax.grid(True)
@@ -118,6 +118,7 @@ class ParametricAnalysis:
 
         """
         display_output = outputs * display_units[-1]
+        values = copy.deepcopy(values)
         for i in range(2): values[i] = [val * display_units[i] for val in values[i]]
 
         # contours

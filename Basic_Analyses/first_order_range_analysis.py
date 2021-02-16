@@ -44,15 +44,16 @@ def electricCessna208Analysis():
             "reserve_fraction":        0.2,            # fraction of useable capacity
 
             # aero
-            "wingspan":                15.87,          # [m]
-            "wing_area":               25.96,          # [m^2]
-            "wing_efficiency":         0.8,            # Oswald efficiency factor
+            "wingspan":                15.87,           # [m]
+            "wing_area":               25.96,           # [m^2]
+            "wing_efficiency":         0.8,             # Oswald efficiency factor
             "drag_coeff_parasitic":    0.034,           # estimate for small AoA
 
             # performance
             "cruise_speed":            344 * kmh_to_ms,  # [m/s]
             "cruise_altitude":         3200,             # [m]
-            "climb_rate":              6.27,              # [m/s]
+            "climb_rate":              6.3,              # [m/s]
+            "acceleration":            0.2,              # [m/s^2]
 
             # Propulsion
             "engine_max_power":        503e3,  # [W]
@@ -80,10 +81,17 @@ def electricCessna208Analysis():
     units = [1, m_to_km]
     battery_ranges = analysis.parametricStudy(["battery_mass"], [battery_masses], display_units=units)
 
-    # # cruise speed
+    # cruise speed
     cruise_speeds = np.linspace(300, 500, 20) * kmh_to_ms
     units = [1 / kmh_to_ms, m_to_km]
     speed_ranges = analysis.parametricStudy(["cruise_speed"], [cruise_speeds], display_units=units)
+
+    # cruise speed and cruise altitude
+    cruise_altitudes = np.linspace(2000, 6000, 100)
+    units = [1 / kmh_to_ms, m_to_km, m_to_km]
+    results = analysis.parametricStudy(["cruise_speed", "cruise_altitude"],
+                                        [cruise_speeds, cruise_altitudes],
+                                        display_units=units)
 
 
 # =======================
@@ -103,12 +111,12 @@ def flightRange(cfg, verbose=False):
     energy_stored -= takeoff_energy
 
     # climb
-    climb_energy = climbEnergy(takeoff_speed, cfg)
+    climb_energy, climb_range = climbEnergyAndRange(takeoff_speed, cfg)
     energy_stored -= climb_energy
 
     # cruise
     cruise_power = cruisePower(cfg)  # [W]
-    flight_range = cfg.cruise_speed * energy_stored / cruise_power
+    flight_range = cfg.cruise_speed * energy_stored / cruise_power + climb_range
 
     if verbose:
         print(f"\nTakeoff energy: {takeoff_energy / Wh_to_J :<.2f} [Wh]")
@@ -169,25 +177,40 @@ def takeoffEnergy(takeoff_speed, cfg):
     return takeoff_energy 
 
 
-def climbEnergy(takeoff_speed, cfg):
+def climbEnergyAndRange(takeoff_speed, cfg):
     """
-    Estimate energy usage during climb given a known climb rate
-    Assumes a linear speed increase up to the cruise speed
+    Estimate energy usage during climb given a known cruise climb rate
+    Assumes a linear speed increase up to the cruise speed over a fixed time
+    and a linear increase in climb rate
     """
-    climb_time = cfg.cruise_altitude / cfg.climb_rate
+    acceleration = cfg.acceleration
+    climb_rate_ratio = cfg.climb_rate / cfg.cruise_speed
 
-    def climbPower(time):
-        speed = (cfg.cruise_speed / climb_time) * time + takeoff_speed  # linear profile
-        altitude = cfg.climb_rate * time
+    climb_energy = 0
+    speed = takeoff_speed
+    altitude = 0
+    climb_distance = 0
+    time = 0
+    dT = 2  # [s]
+    while altitude < cfg.cruise_altitude:
+        time += dT
+        if speed < cfg.cruise_speed:
+            speed += acceleration * dT  # linear profile
+        else:
+            speed = cfg.cruise_speed
+            acceleration = 0
+
+        climb_rate = min(cfg.climb_rate, climb_rate_ratio * speed)
+        altitude += climb_rate * dT
+        climb_distance += speed * np.cos(np.arctan(climb_rate)) * dT
+
         density = airDensity(altitude)
         dynamic_pressure = dynamicPressure(density, speed)
         drag = (cfg.drag_coeff_parasitic + inducedDrag(dynamic_pressure, cfg)) * cfg.wing_area * dynamic_pressure
-        thrust = drag + cfg.total_mass * gravity * cfg.climb_rate / speed
-        power = thrust * speed
-        return power
+        thrust = drag + cfg.total_mass * (gravity * climb_rate_ratio + acceleration)
+        climb_energy += thrust * speed * dT
 
-    climb_energy = integrate.quad(climbPower, 0, climb_time)[0]
-    return climb_energy
+    return climb_energy, climb_distance
 
 
 def cruisePower(cfg):
@@ -230,3 +253,32 @@ if __name__ == "__main__":
 
 
 
+    # def climbPower(time):
+    #     speed = (cfg.cruise_speed / climb_time) * time + takeoff_speed  # linear profile
+    #     speeds.append(speed)
+    #     times.append(time)
+
+    #     altitude = cfg.climb_rate * time
+    #     density = airDensity(altitude)
+    #     dynamic_pressure = dynamicPressure(density, speed)
+    #     drag = (cfg.drag_coeff_parasitic + inducedDrag(dynamic_pressure, cfg)) * cfg.wing_area * dynamic_pressure
+    #     thrust = drag + cfg.total_mass * gravity * cfg.climb_rate / speed
+    #     power = thrust * speed
+    #     return power
+
+    # climb_energy = integrate.quad(climbPower, 0, climb_time)[0]
+
+    # # compute distance travelled
+    # print(np.arctan(cfg.climb_rate) * 180 / np.pi)
+    # horizontal_speed = np.array(speeds) * np.cos(np.arctan(cfg.climb_rate))
+
+    # print(horizontal_speed[0])
+    # print(horizontal_speed[8])
+    # print(horizontal_speed[20])
+
+    # climb_distance = np.trapz(horizontal_speed, x=times)
+
+
+    # climb_time = cfg.cruise_altitude / cfg.climb_rate
+    # speeds = []
+    # times = []
