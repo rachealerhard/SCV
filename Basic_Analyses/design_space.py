@@ -17,6 +17,7 @@ from first_order_range_analysis import gravity, airDensity, dynamicPressure
 kmh_to_ms = 1 / 3.6
 Wh_to_J = 3600
 s_to_hr = 1 / 3600
+m_to_ft = 3.28
 
 
 def designSpace():
@@ -26,11 +27,11 @@ def designSpace():
     # =========================
     # Definitions
     # =========================
-    battery_mass_fraction = 0.4
+    battery_mass_fraction = 0.3
     propulsive_efficiency = 0.9
 
     endurance = 1.5 / s_to_hr  # [s]
-    altitude = 3000            # [m]
+    altitude = 3200            # [m]
     density = airDensity(altitude)
 
     # =================================
@@ -52,8 +53,11 @@ def designSpace():
     fig, ax = plt.subplots()
     title = f"Energy Speed Tradeoffs"
     fig.suptitle(title, fontsize=14, fontweight='bold')
-    ax.text(260, 40, f"Endurance: {endurance * s_to_hr:.1f} hr \nWeight_fraction: {battery_mass_fraction*100:.0f} %",
-            size=18, bbox={'facecolor': 'white', 'alpha': 1.0, 'pad':6})
+    ax.text(260, 40,
+            f"Endurance: {endurance * s_to_hr:.1f} hr \
+            \nWeight fraction: {battery_mass_fraction * 100:.0f} %\
+            \nAltitude: {altitude * m_to_ft:.0f} ft",
+            size=18, bbox={'facecolor': 'tab:blue', 'alpha': 0.8, 'pad':6})
     ax.set_xlabel("TAS [km/h]")
     ax.set_ylabel("L/D (aerodynamic efficiency)")
     ax.grid(True)
@@ -68,11 +72,11 @@ def designSpace():
     # Aerodynamic Efficiency vs. airspeed
     # ==================================
     vehicles = ["Glider", "Cessna 208", "747-400"]
-    drag_coeffs = [0.015, 0.02, 0.031]
+    drag_coeffs = [0.015, 0.03, 0.031]
     aspect_ratios = [40, 9.7, 7.9]
     wing_areas = [18.61, 25.96, 525]  # [m^2]
     masses = [780, 3629, 400e3]  # [kg]
-    e = 0.85
+    e = [0.9, 0.85, 0.8]
     LD_aircraft = {}
 
     for i, name in enumerate(vehicles):
@@ -80,18 +84,21 @@ def designSpace():
         for v in airspeeds:
             q = dynamicPressure(density, v * kmh_to_ms)
             CL = masses[i] * gravity / (q * wing_areas[i])
-            Cd_induced =  (CL ** 2) / (np.pi * aspect_ratios[i] * e)
+            Cd_induced =  (CL ** 2) / (np.pi * aspect_ratios[i] * e[i])
             CD = (drag_coeffs[i] + Cd_induced)
             LD = CL / CD
             LD_aircraft[name].append(LD)
 
     # Visualize
-    color = mcolors.CSS4_COLORS['lightcoral']
-    for key, values in LD_aircraft.items():
-        ax.plot(airspeeds, values, ls='dashed', color=color)
-        text_x = airspeeds[np.argmax(values)-3]
+    colorA = mcolors.CSS4_COLORS['lightcoral']
+    colorB = mcolors.CSS4_COLORS['violet']
+    colorC = mcolors.CSS4_COLORS['yellowgreen']
+    colors = [colorA, colorB, colorC]
+    for idx, (key, values) in enumerate(LD_aircraft.items()):
+        ax.plot(airspeeds, values, ls='dashed', color=colors[idx])
+        text_x = airspeeds[np.argmax(values)-2]
         text_y = np.max(values) + 1
-        ax.text(text_x, text_y, key, size=9, bbox={'facecolor': color, 'alpha': 0.7, 'pad':1})
+        ax.text(text_x, text_y, key, size=9, bbox={'facecolor': colors[idx], 'alpha': 0.7, 'pad':1})
 
     plt.show()
 
