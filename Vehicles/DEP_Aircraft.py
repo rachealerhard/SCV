@@ -30,7 +30,7 @@ import os
 #   Define the Vehicle
 # ----------------------------------------------------------------------
 
-def vehicle_setup(cargo_mass, battery_mass):
+def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2100*Units.kg):
     
     # ------------------------------------------------------------------
     #   Initialize the Vehicle
