@@ -38,7 +38,7 @@ def main():
     # mission analysis
     mission = analyses.missions.base
     results = mission.evaluate()
-     
+    
     # lift coefficient  
     lift_coefficient              = results.segments.cruise.conditions.aerodynamics.lift_coefficient[1][0]
 

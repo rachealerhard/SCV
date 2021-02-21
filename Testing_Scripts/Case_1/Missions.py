@@ -15,10 +15,10 @@ import numpy as np
 
 # Import missions:
 import sys
-sys.path.append('../Missions')
+sys.path.append('../../Missions')
 #from cruise_mission_variable_cruise_range import cruise_mission_setup
 #from full_mission_variable_cruise_range   import full_mission_setup
-from cruise_mission_fixed_mission_profile import cruise_mission_setup
+#from cruise_mission_fixed_mission_profile import cruise_mission_setup
 #from full_mission_fixed_mission_profile   import full_mission_setup
 from full_mission_30min_cruise_reserve_variable_cruise  import full_mission_setup
 
@@ -30,7 +30,7 @@ from full_mission_30min_cruise_reserve_variable_cruise  import full_mission_setu
     
 def setup(analyses,vehicle):
     
-    mission = full_mission_setup(vehicle, analyses) # vehiclde configs
+    mission = full_mission_setup(vehicle, analyses)
 
-    #mission = cruise_mission_setup(vehicle, analyses) # vehiclde configs    
+    #mission = cruise_mission_setup(vehicle, analyses) 
     return mission

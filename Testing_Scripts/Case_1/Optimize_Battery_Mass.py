@@ -24,7 +24,7 @@ import time
 # ----------------------------------------------------------------------  
 def main(args):
     '''
-    
+    Finds the battery mass required for Case 1: 530km range, 2300lb payload
     '''
     problem = setup(args.Vehicle)
     
@@ -58,7 +58,7 @@ def setup(vehicle_name):
 
     # [ tag , initial, [lb,ub], scaling, units ]
     problem.inputs = np.array([
-        [ 'bat_mass'       ,   2500.  , ( 2000. , 2600.), 1e3 , Units.kg      ],        
+        [ 'bat_mass'       ,   2450.  , ( 2300. , 2600.), 1e3 , Units.kg      ],        
         ]) 
 
     # -------------------------------------------------------------------
@@ -68,7 +68,7 @@ def setup(vehicle_name):
     # [ tag, scaling, units ]
     problem.objective = np.array([
         ['Nothing', 1, Units.less],
-        #[ 'energy_usage', 1e8, Units.J], 
+        #['specified_range', -1., Units.km]
     ])
     
     # -------------------------------------------------------------------
@@ -77,8 +77,7 @@ def setup(vehicle_name):
 
     # [ tag, sense, edge, scaling, units ]
     problem.constraints = np.array([
-        ['specified_range', 1., Units.meter],
-        #[ 'battery_remaining', '>', 0.30, 1., Units.less],
+        ['specified_range', '<', 400., 1, Units.meter] # within 100m of specified range
     ])
     
     # -------------------------------------------------------------------
@@ -87,13 +86,10 @@ def setup(vehicle_name):
     
     # [ 'alias' , ['data.path1.name','data.path2.name'] ]
     problem.aliases = [
-        [ 'bat_mass'    , ['vehicle_configurations.*.mass_properties.battery_mass',
-                           'vehicle_configurations.*.propulsors.battery_propeller.battery.mass_properties.mass'] ],
-        [ 'energy_usage'      , 'summary.energy_usage'                    ],
-        [ 'total_weight'    , 'summary.total_weight'  ],
-        [ 'battery_remaining' , 'summary.battery_remaining'                    ],
-        [ 'Nothing'          ,  'summary.nothing'       ],
-        [ 'specified_range , summary.specified_range'  ]
+        [ 'bat_mass'        , ['vehicle_configurations.*.mass_properties.battery_mass',
+                               'vehicle_configurations.*.propulsors.battery_propeller.battery.mass_properties.mass'] ],
+        [ 'Nothing'         ,  'summary.nothing'         ],
+        [ 'specified_range' , 'summary.specified_range'  ]
     ]      
     
     # -------------------------------------------------------------------

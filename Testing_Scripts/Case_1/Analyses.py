@@ -1,59 +1,35 @@
-# vehicle_visualization.py
-#
-# Created: Feb 2021, R. Erhard
-# Modified:
+# Analyses.py
+# 
+# Created:  Jan 2021, R. Erhard
+# Modified: 
 
-#-------------------------------------------------------------------------------
-# Imports
-#-------------------------------------------------------------------------------
+# ----------------------------------------------------------------------        
+#   Imports
+# ----------------------------------------------------------------------    
 
 import SUAVE
 
-from SUAVE.Core import Units, Data
-from SUAVE.Methods.Performance.electric_payload_range import electric_payload_range
-from SUAVE.Plots.Geometry_Plots.plot_vehicle import plot_vehicle  
+# ----------------------------------------------------------------------        
+#   Setup Analyses
+# ----------------------------------------------------------------------  
 
-import numpy as np
-import matplotlib.pyplot as plt
-
-#from Cessna_208B_electric import vehicle_setup
-#from DEP_Aircraft import vehicle_setup
-from Cessna_208B_electric import vehicle_setup
-
-import sys
-sys.path.append('../Missions')
-from cruise_mission_fixed_mission_profile import mission as mission_setup
-
-#-------------------------------------------------------------------------------
-# Test Function
-#-------------------------------------------------------------------------------
-
-def main():
-    # Set vehicle mass properties and geometry
-    cargo_mass = 1000 * Units.lb
-    battery_mass = 1009 * Units.kg
-    vehicle  = vehicle_setup(cargo_mass,battery_mass)
+def setup(configs):
     
-    # Set wake visualization
-    wake_visualization = False
+    analyses = SUAVE.Analyses.Analysis.Container()
     
-    if wake_visualization:
-        
-        analyses = base_analysis(vehicle)
-        mission  = mission_setup(analyses,vehicle)
-        
-        analyses.mission = mission
-        analyses.finalize()
-        
-        results = mission.evaluate()
+    # build a base analysis for each config
+    for tag,config in configs.items():
+        analysis = base(config)
+        analyses[tag] = analysis
     
-    plot_vehicle(vehicle, save_figure = False, plot_control_points = False)
-    plt.show() 
-    
-    return
-    
-def base_analysis(vehicle):
+    return analyses
 
+# ----------------------------------------------------------------------        
+#   Define Base Analysis
+# ----------------------------------------------------------------------  
+
+def base(vehicle):
+    
     # ------------------------------------------------------------------
     #   Initialize the Analyses
     # ------------------------------------------------------------------     
@@ -76,11 +52,17 @@ def base_analysis(vehicle):
     #  Aerodynamics Analysis
     # ------------------------------------------------------------------ 
     aerodynamics = SUAVE.Analyses.Aerodynamics.Fidelity_Zero()
-    aerodynamics.settings.use_surrogate              = False
-    aerodynamics.settings.propeller_wake_model       = True     
     aerodynamics.geometry = vehicle
+    #aerodynamics.settings.number_spanwise_vortices  = 10 
+    #aerodynamics.settings.number_chordwise_vortices = 2    
     analyses.append(aerodynamics)
     
+    # ------------------------------------------------------------------
+    #  Stability Analysis
+    # ------------------------------------------------------------------
+    stability = SUAVE.Analyses.Stability.Fidelity_Zero()
+    stability.geometry = vehicle
+    analyses.append(stability)    
     
     # ------------------------------------------------------------------
     #  Energy
@@ -101,8 +83,5 @@ def base_analysis(vehicle):
     atmosphere = SUAVE.Analyses.Atmospheric.US_Standard_1976()
     atmosphere.features.planet = planet.features
     analyses.append(atmosphere)   
-
-    return analyses
-
-if __name__ == '__main__':
-    main()
+    
+    return analyses    

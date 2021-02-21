@@ -60,7 +60,7 @@ def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2100*Units.kg):
     # ------------------------------------------------------------------        
     #   Main Wing
     # ------------------------------------------------------------------        
-
+    
     wing = SUAVE.Components.Wings.Main_Wing()
     wing.tag = 'main_wing'
     
@@ -69,7 +69,7 @@ def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2100*Units.kg):
     wing.vertical                = False
     wing.symmetric               = True
     wing.high_lift               = True
-
+    
     wing.dynamic_pressure_ratio  = 1.0
     
     # Main wing control surface:
@@ -82,30 +82,30 @@ def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2100*Units.kg):
     flap.chord_fraction        = 0.30   
     wing.append_control_surface(flap)       
     
-
+    
     # add to vehicle
     vehicle.append_component(wing)
     
-
+    
     # ------------------------------------------------------------------        
     #  Horizontal Stabilizer
     # ------------------------------------------------------------------        
-
+    
     wing = SUAVE.Components.Wings.Wing()
     wing.tag = 'horizontal_stabilizer'
     
     wing = hstab_inputs(wing)
-
+    
     wing.vertical                = False
     wing.symmetric               = True
     wing.high_lift               = False
-
+    
     wing.dynamic_pressure_ratio  = 0.9
-
+    
     # add to vehicle
     vehicle.append_component(wing)
-
-
+    
+    
     # ------------------------------------------------------------------
     #   Vertical Stabilizer
     # ------------------------------------------------------------------

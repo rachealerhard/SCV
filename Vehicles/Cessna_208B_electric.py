@@ -30,7 +30,7 @@ import os
 #   Define the Vehicle
 # ----------------------------------------------------------------------
 
-def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2100*Units.kg):
+def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2450*Units.kg):
     
     # ------------------------------------------------------------------
     #   Initialize the Vehicle
@@ -194,7 +194,7 @@ def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2100*Units.kg):
     
     # Component: Battery
     bat = SUAVE.Components.Energy.Storages.Batteries.Constant_Mass.Lithium_Ion()
-    #bat = bat_inputs(bat)
+
     bat.mass_properties.mass = vehicle.mass_properties.battery_mass
     bat.specific_energy      = (450 *Units.Wh/Units.kg) * 0.8 # weighted by packing factor
     bat.resistance           = 0.006
@@ -470,10 +470,6 @@ def prop_inputs(prop):
     
     return prop    
 
-def bat_inputs(bat):
-    bat.mass_properties.mass = 1009 * Units.kg
-    
-    return bat
 
 def calculate_takeoff_weight(vehicle):
     # ------------------------------------------------------------------
@@ -498,7 +494,7 @@ def calculate_takeoff_weight(vehicle):
         MTOW    = empty + payload + batmass
         vehicle.mass_properties.max_takeoff = MTOW
         vehicle.mass_properties.takeoff = MTOW
-        vehicle.mass_properties.operating_empty = empty +batmass
+        vehicle.mass_properties.operating_empty = empty
         if abs(empty-prior_empty) <1e-5:
             converged = True
         else:

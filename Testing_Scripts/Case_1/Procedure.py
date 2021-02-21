@@ -25,9 +25,7 @@ def setup():
     #   Analysis Procedure
     # ------------------------------------------------------------------ 
     
-    # size the base config
     procedure = Process()
-    procedure.simple_sizing   = simple_sizing
     
     # compute the vehicle weights, size and charge the battery
     procedure.weights_battery = weights_battery
@@ -58,56 +56,7 @@ def simple_mission(nexus):
     
     return nexus
 
-# ----------------------------------------------------------------------        
-#   Sizing
-# ----------------------------------------------------------------------    
 
-
-def simple_sizing(nexus):
-
-    # Pull out the vehicle
-    base = nexus.vehicle_configurations.base
-
-    ## Change the dynamic pressure based on the, add a factor of safety   
-    #base.envelope.maximum_dynamic_pressure = nexus.missions.mission.segments.cruise.dynamic_pressure*1.2
-
-    # Scale the horizontal and vertical tails based on the main wing area
-    base.wings.horizontal_stabilizer.areas.reference = 0.15 * base.reference_area
-    base.wings.vertical_stabilizer.areas.reference   = 0.08 * base.reference_area
-
-    # wing spans,areas, and chords
-    for wing in base.wings:
-
-        # Unpack
-        AR = wing.aspect_ratio
-        S  = wing.areas.reference
-        taper_ratio = wing.taper
-
-        # Set the spans
-        wing.spans.projected = np.sqrt(AR*S)
-
-        # Set all of the areas for the surfaces
-        wing.areas.wetted   = 1.75* S
-        wing.areas.exposed  = 0.8 * wing.areas.wetted
-        wing.areas.affected = 0.6 * wing.areas.wetted   
-
-        # Set all of the chord lengths
-        chord = wing.areas.reference/wing.spans.projected
-        wing.chords.mean_aerodynamic = chord
-        wing.chords.mean_geometric   = chord
-        wing.chords.tip              = 2*chord/(1+(1/taper_ratio))
-        wing.chords.root             = wing.chords.tip/taper_ratio
-        
-
-    # Resize the motor
-    motor = base.propulsors.battery_propeller.motor
-    prop = base.propulsors.battery_propeller.propeller
-    motor = size_optimal_motor(motor,prop)    
-
-    # diff the new data
-    base.store_diff()
-
-    return nexus
 
 # ----------------------------------------------------------------------
 #   Calculate weights and charge the battery
@@ -139,10 +88,10 @@ def weights_battery(nexus):
         else:
             prior_empty = empty        
     
-    ## update the battery parameters based on the battery mass
-    #bat     = base.propulsors.battery_propeller.battery
-    #initialize_from_mass(bat,batmass)
-    #base.propulsors.battery_propeller.battery.mass_properties.mass = batmass
+    # update the battery parameters based on the battery mass
+    bat     = base.propulsors.battery_propeller.battery
+    initialize_from_mass(bat,batmass)
+    base.propulsors.battery_propeller.battery = bat #.mass_properties.mass = batmass
     
     # Set Battery Charge
     maxcharge = nexus.vehicle_configurations.base.propulsors.battery_propeller.battery.max_energy
@@ -176,33 +125,32 @@ def post_process(nexus):
     
     # Check total range:
     mission_range = res[-1].conditions.frames.inertial.position_vector[-1,0]    
+    range_w_reserve = (mission_range) - 144841. # 30min reserve at 180mph
     mission_time = res[-1].conditions.frames.inertial.time[-1,0]
        
     # Final Energy
     maxcharge         = base.propulsors.battery_propeller.battery.max_energy
-    extra_energy      = res[-1].conditions.propulsion.battery_energy[-1,0] #(maxcharge - res[-1].conditions.propulsion.battery_energy[-1,0])
-    battery_remaining = extra_energy/maxcharge
+    extra_energy      = res[-1].conditions.propulsion.battery_energy[-1,0] # (maxcharge - res[-1].conditions.propulsion.battery_energy[-1,0])
+    battery_remaining_after_reserve = extra_energy/maxcharge
     
-    # Aerodynamics in cruise
-    cruise_aoa = res.cruise.state.conditions.aerodynamics.angle_of_attack[0,0] / Units.deg
-    parasitic_drag = res.cruise.state.conditions.aerodynamics.drag_breakdown.parasite.total[0,0]
-    induced_drag   = res.cruise.state.conditions.aerodynamics.drag_breakdown.induced.total[0,0]
-    total_drag     = res.cruise.state.conditions.aerodynamics.drag_breakdown.total[0][0]
-    trim_corrected_drag = res.cruise.state.conditions.aerodynamics.drag_breakdown.trim_corrected_drag[0][0]
+    reserve_energy = res.cruise_reserve.conditions.propulsion.battery_energy[0,0] - res.cruise_reserve.conditions.propulsion.battery_energy[-1,0]
+    energy_usage       = (maxcharge-abs(extra_energy)-abs(reserve_energy))    
+    battery_remaining = (extra_energy+reserve_energy)/maxcharge    
     
     # Pack up
     summary = nexus.summary
     #summary.mission_time       = mission_time
-    summary.mission_range       = mission_range   
+    summary.mission_range       = range_w_reserve   
     summary.nothing            = 0.0
+    summary.battery_remaining_after_reserve  = battery_remaining_after_reserve
     summary.battery_remaining  = battery_remaining
     summary.payload            = base.mass_properties.max_payload
-    summary.energy_usage       = (maxcharge-extra_energy)
+    summary.energy_usage       = energy_usage
     summary.total_weight       = total_weight
-    summary.objective          = (summary.total_weight/1e3) + (summary.energy_usage/1e8)
+    summary.payload            = base.mass_properties.max_payload
     
-    range_required = 530*Units.km
-    summary.specified_range = abs(range_required - mission_range)
+    range_required = 530 * Units.km
+    summary.specified_range = abs(range_required - range_w_reserve)
     
    
     print(f"\nBattery weight: {base.mass_properties.battery_mass :.6f} [kg] ")
@@ -210,19 +158,15 @@ def post_process(nexus):
     print(f"Payload weight: {base.mass_properties.max_payload :.6f} [kg]")
     print(f"Total weight: {total_weight :.6f} [kg]\n") 
     
-    print(f"Battery remaining: {battery_remaining :.6f} ")
+    print(f"Battery remaining (after reserve): {battery_remaining_after_reserve :.6f} ")
+    print(f"Battery remaining (before reserve): {battery_remaining :.6f} ")
     print(f"Energy usage: {summary.energy_usage/Units.kWh :.6f} [kWh]")
     print(f"Maxcharge: {maxcharge/Units.kWh :.6f} [kWh] \n")
     
 
     print(f"Required Range: {range_required/1000 :.6f} [km]")    
-    print(f"Mission Range: {mission_range/1000 :.6f} [km] \n")    
+    print(f"Mission Range: {range_w_reserve/1000 :.6f} [km] \n")    
     
-    #print(f"Cruise angle of attack: {cruise_aoa :.6f} [deg]")
-    #print(f"CD cruise: {total_drag :.6f} [-]")
-    #print(f"CD induced: {induced_drag :.6f} [-]")
-    #print(f"CD parasitic: {parasitic_drag :.6f} [-]")    
-    #print(f"CD trim: {trim_corrected_drag :.6f} [-]\n")      
-    
+
     return nexus    
 
