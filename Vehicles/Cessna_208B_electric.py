@@ -164,8 +164,8 @@ def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2450*Units.kg):
     prop.freestream_velocity = 180.   * Units.mph
     prop.angular_velocity    = 1700.  * Units.rpm   
     prop.design_altitude     = 12000. * Units.feet
-    prop.design_thrust       = None #0.0
-    prop.design_power        = .64 * 503 * Units.kilowatts    
+    prop.design_thrust       = 400*9.81 #None #0.0
+    prop.design_power        = None #.64 * 503 * Units.kilowatts    
     
     prop = prop_inputs(prop)
     

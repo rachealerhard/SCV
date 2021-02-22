@@ -30,7 +30,7 @@ import os
 #   Define the Vehicle
 # ----------------------------------------------------------------------
 
-def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2450*Units.kg):
+def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2100*Units.kg):
     
     # ------------------------------------------------------------------
     #   Initialize the Vehicle
@@ -146,7 +146,7 @@ def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2450*Units.kg):
     
     # build network    
     net = Battery_Propeller()
-    net.number_of_engines = 12. # run various discrete cases
+    net.number_of_engines = 8. # run various discrete cases
     net.nacelle_diameter  = 42 * Units.inches
     net.engine_length     = 0.01 * Units.inches
     
@@ -162,7 +162,7 @@ def vehicle_setup(cargo_mass=2300*Units.lb, battery_mass=2450*Units.kg):
     prop = SUAVE.Components.Energy.Converters.Propeller()
     prop.number_of_blades       = 3.0
     prop.freestream_velocity = 180.   * Units.mph
-    prop.angular_velocity    = 2900.  * Units.rpm   
+    prop.angular_velocity    = 2500.  * Units.rpm   
     prop.design_altitude     = 12000. * Units.feet
     prop.design_thrust       = 400*9.81/net.number_of_engines #None #0.0
     prop.design_power        = None #.64 * 503 * Units.kilowatts   / net.number_of_engines 
@@ -459,7 +459,7 @@ def fuselage_inputs(fuselage):
     return fuselage
 
 def prop_geom(prop):
-    prop.tip_radius          = 0.3886 * Units.meter 
+    prop.tip_radius          = 0.47595 * Units.meter 
     prop.hub_radius          = 0.2* prop.tip_radius 
     prop.design_Cl           = 0.8
     return prop

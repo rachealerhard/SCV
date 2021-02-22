@@ -66,6 +66,19 @@ def weights_battery(nexus):
 
     # Evaluate weights for all of the configurations
     config = nexus.analyses.base
+    base     = nexus.vehicle_configurations.base
+    
+    # update the battery parameters based on the new battery mass
+    bat     = base.propulsors.battery_propeller.battery
+    initialize_from_mass(bat,batmass)
+    base.propulsors.battery_propeller.battery = bat #.mass_properties.mass = batmass
+    base.propulsors.battery_propeller.voltage = bat.max_voltage
+    
+    # update the motor based on the new battery parameters
+    propeller_motor   = base.propulsors.battery_propeller.motor
+    propeller_motor.nominal_voltage      = bat.max_voltage 
+    propeller_motor                      = size_optimal_motor(propeller_motor, base.propulsors.battery_propeller.propeller)
+    base.propulsors.battery_propeller.motor      = propeller_motor
     
     # converge on weights (since landing gear weight is a function of MTOW)
     converged = False
@@ -88,17 +101,12 @@ def weights_battery(nexus):
         else:
             prior_empty = empty        
     
-    # update the battery parameters based on the battery mass
-    bat     = base.propulsors.battery_propeller.battery
-    initialize_from_mass(bat,batmass)
-    base.propulsors.battery_propeller.battery = bat #.mass_properties.mass = batmass
-    
     # Set Battery Charge
     maxcharge = nexus.vehicle_configurations.base.propulsors.battery_propeller.battery.max_energy
     nexus.missions.mission.segments[0].battery_energy = maxcharge 
 
     return nexus
-    
+
 # ----------------------------------------------------------------------
 #   Finalizing Function
 # ----------------------------------------------------------------------    

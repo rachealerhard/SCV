@@ -12,7 +12,8 @@ import SUAVE
 from SUAVE.Core import Units, Data
 from SUAVE.Methods.Performance.electric_payload_range import electric_payload_range
 from SUAVE.Plots.Geometry_Plots.plot_vehicle import plot_vehicle  
-
+from SUAVE.Methods.Power.Battery.Sizing import initialize_from_mass
+from SUAVE.Methods.Propulsion.electric_motor_sizing import size_from_kv, size_optimal_motor
 
 import time
 import numpy as np
@@ -39,7 +40,7 @@ def main():
         
         if case == 1:
             cargo_mass = 2300 * Units.lb
-            battery_mass = 2349. * Units.kg #2349.265192934415 * Units.kg
+            battery_mass = 2329.3 * Units.kg
             base_vehicle = 'extra_bat'
             
         elif case ==2:
@@ -82,7 +83,7 @@ def main():
               f"Case {case } \n"
               f"---------------------------------------\n")
         start_t = time.time()    
-        results = payload_range_analysis(cargo_mass, battery_mass, base_vehicle)
+        results = get_results(cargo_mass, battery_mass, base_vehicle)
         elapsed = (time.time() - start_t)/60 
         print(f"\nElapsed time: {elapsed :.2f} [min] ")
         
@@ -95,9 +96,29 @@ def main():
 # Test Function
 #-------------------------------------------------------------------------------
 
-def payload_range_analysis(cargo_mass, battery_mass, base_vehicle):
+def get_results(cargo_mass, battery_mass, base_vehicle):
     
-    vehicle  = vehicle_setup(cargo_mass,battery_mass)
+    #vehicle  = vehicle_setup(cargo_mass,battery_mass)
+    vehicle  = vehicle_setup(cargo_mass,)
+    vehicle.mass_properties.battery_mass = battery_mass
+    vehicle.propulsors.battery_propeller.battery.mass_properties.mass = battery_mass
+    
+    # Recompute battery parameters
+    bat = vehicle.propulsors.battery_propeller.battery
+    initialize_from_mass(bat,battery_mass)
+    vehicle.propulsors.battery_propeller.battery = bat
+    vehicle.propulsors.battery_propeller.voltage = bat.max_voltage
+    
+    # Recompute motor parameters
+    propeller_motor = vehicle.propulsors.battery_propeller.motor
+    propeller_motor.nominal_voltage = bat.max_voltage
+    propeller_motor = size_optimal_motor(propeller_motor, vehicle.propulsors.battery_propeller.propeller)
+    vehicle.propulsors.battery_propeller.motor = propeller_motor
+    
+    # Redo weights and battery sizing
+    vehicle = calculate_takeoff_weight(vehicle)
+    
+    
     vehicle_configs = configs_setup(vehicle)
     
     # Analysis
@@ -105,6 +126,8 @@ def payload_range_analysis(cargo_mass, battery_mass, base_vehicle):
     missions  = mission_setup(vehicle_configs,analyses)
     
     analyses.mission = missions.mission
+    # set battery to max charge
+    
     analyses.finalize()
     
     results = missions.mission.evaluate()
@@ -112,6 +135,36 @@ def payload_range_analysis(cargo_mass, battery_mass, base_vehicle):
 
     return results
 
+def calculate_takeoff_weight(vehicle):
+    # ------------------------------------------------------------------
+    #  Weights Analysis
+    # ------------------------------------------------------------------ 
+    converged = False
+    prior_empty = 0
+    while converged == False:
+        
+        analyses = SUAVE.Analyses.Vehicle()
+        
+        weights = SUAVE.Analyses.Weights.Weights_Transport()
+        weights.vehicle = vehicle
+        analyses.append(weights)
+            
+        analyses.weights.evaluate()
+        
+        empty   = vehicle.weight_breakdown.empty 
+        payload = vehicle.mass_properties.max_payload
+        batmass = vehicle.mass_properties.battery_mass
+        
+        MTOW    = empty + payload + batmass
+        vehicle.mass_properties.max_takeoff = MTOW
+        vehicle.mass_properties.takeoff = MTOW
+        vehicle.mass_properties.operating_empty = empty
+        if abs(empty-prior_empty) <1e-5:
+            converged = True
+        else:
+            prior_empty = empty
+    
+    return vehicle
 
 def analyze_results(vehicle,results):
     base = vehicle

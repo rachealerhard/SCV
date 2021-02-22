@@ -77,6 +77,7 @@ def setup(vehicle_name):
 
     # [ tag, sense, edge, scaling, units ]
     problem.constraints = np.array([
+        #['Nothing', '=', 0.0, 1, Units.less]
         ['specified_range', '<', 400., 1, Units.meter] # within 100m of specified range
     ])
     
