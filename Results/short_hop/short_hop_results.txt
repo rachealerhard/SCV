@@ -1,0 +1,77 @@
+Short Hop mission results.
+Each hop reaches a cruise altitude of 1500m asl
+
+# ==================================
+# Case 1
+# 450 Wh/kg
+# 3 hops total (results for a single hop)
+# ==================================
+Battery weight: 2361.000000 [kg]
+Empty weight: 4626.833026 [kg]
+Payload weight: 1043.262451 [kg]
+Total weight: 5670.095477 [kg]
+
+Battery remaining: 0.720000
+Energy usage: 108.925718 [kWh]
+Total energy: 849.960000 [kWh]
+
+Range: 110.442641 [km]
+
+Mission time: 55.469007 [min]
+Max altitude: 1500.000000 [m]
+
+# =================================
+# Case 2
+# 350 Wh/kg
+# 3 hops total (results for a single hop)
+# ==================================
+Battery weight: 2361.000000 [kg]
+Empty weight: 4626.833026 [kg]
+Payload weight: 1043.262451 [kg]
+Total weight: 5670.095477 [kg]
+
+Battery remaining: 0.720000
+Energy usage: 56.419597 [kWh]
+Total energy: 661.080000 [kWh]
+
+Range: 50.269048 [km]
+
+Mission time: 43.005628 [min]
+Max altitude: 1500.000000 [m]
+
+# ==================================
+# Case 3
+# 450 Wh/kg
+# 4 hops total (results for a single hop)
+# ==================================
+Battery weight: 2361.000000 [kg]
+Empty weight: 4626.833026 [kg]
+Payload weight: 1043.262451 [kg]
+Total weight: 5670.095477 [kg]
+
+Battery remaining: 0.787500
+Energy usage: 53.117879 [kWh]
+Total energy: 849.960000 [kWh]
+
+Range: 46.548499 [km]
+
+Mission time: 42.235014 [min]
+
+
+# ==================================
+# Case 4
+# 350 Wh/kg
+# 4 hops total (results for a single hop)
+# ==================================
+Battery weight: 2361.000000 [kg]
+Empty weight: 4626.833026 [kg]
+Payload weight: 1043.262451 [kg]
+Total weight: 5670.095477 [kg]
+
+Battery remaining: 0.787500
+Energy usage: 13.465598 [kWh]
+Total energy: 661.080000 [kWh]
+
+Range: 0.633040 [km]
+
+Mission time: 32.724832 [min]
